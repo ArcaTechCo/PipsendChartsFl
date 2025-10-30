@@ -23,24 +23,24 @@
 <table>
   <tr>
     <td align="center">
-      <img src="example/demo_gifs/indicators.png" alt="Technical Indicators" width="240"/><br/>
+      <img src="https://raw.githubusercontent.com/ArcaTechCo/PipsendChartsFl/main/example/demo_gifs/indicators.png" alt="Technical Indicators" width="240"/><br/>
       <b>Technical Indicators</b><br/>
       <sub>RSI, MACD, Bollinger Bands, Stochastic</sub>
     </td>
     <td align="center">
-      <img src="example/demo_gifs/lines.png" alt="Trading Lines" width="240"/><br/>
+      <img src="https://raw.githubusercontent.com/ArcaTechCo/PipsendChartsFl/main/example/demo_gifs/lines.png" alt="Trading Lines" width="240"/><br/>
       <b>Trading Lines</b><br/>
       <sub>Stop Loss, Take Profit, Support & Resistance</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="example/demo_gifs/zones.png" alt="Price Zones" width="240"/><br/>
+      <img src="https://raw.githubusercontent.com/ArcaTechCo/PipsendChartsFl/main/example/demo_gifs/zones.png" alt="Price Zones" width="240"/><br/>
       <b>Price Zones</b><br/>
       <sub>Demand and Supply zones with labels</sub>
     </td>
     <td align="center">
-      <img src="example/demo_gifs/draw.png" alt="Drawing Tools" width="240"/><br/>
+      <img src="https://raw.githubusercontent.com/ArcaTechCo/PipsendChartsFl/main/example/demo_gifs/draw.png" alt="Drawing Tools" width="240"/><br/>
       <b>Drawing Tools</b><br/>
       <sub>Fibonacci Retracement and Trend Lines</sub>
     </td>

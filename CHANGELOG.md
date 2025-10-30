@@ -1,3 +1,9 @@
+## 1.0.1
+
+* Fix README screenshots to use absolute GitHub URLs for pub.dev compatibility
+
+---
+
 ## 1.0.0 - Pipsend Charts Flutter (Major Release)
 
 **🎉 Complete Rebranding and Feature Overhaul**
