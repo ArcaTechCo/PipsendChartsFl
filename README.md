@@ -20,25 +20,32 @@
 
 <div align="center">
 
-### Technical Indicators
-<img src="example/demo_gifs/indicators.png" alt="Technical Indicators" width="800"/>
-
-*12+ professional indicators - RSI, MACD, Bollinger Bands, Stochastic, and more*
-
-### Trading Lines & Overlays
-<img src="example/demo_gifs/lines.png" alt="Trading Lines" width="800"/>
-
-*Interactive trading lines with drag & drop - Stop Loss, Take Profit, Support & Resistance*
-
-### Price Zones
-<img src="example/demo_gifs/zones.png" alt="Price Zones" width="800"/>
-
-*Demand and Supply zones with customizable colors and labels*
-
-### Drawing Tools
-<img src="example/demo_gifs/draw.png" alt="Drawing Tools" width="800"/>
-
-*Fibonacci Retracement and Trend Lines with angle display*
+<table>
+  <tr>
+    <td align="center">
+      <img src="example/demo_gifs/indicators.png" alt="Technical Indicators" width="240"/><br/>
+      <b>Technical Indicators</b><br/>
+      <sub>RSI, MACD, Bollinger Bands, Stochastic</sub>
+    </td>
+    <td align="center">
+      <img src="example/demo_gifs/lines.png" alt="Trading Lines" width="240"/><br/>
+      <b>Trading Lines</b><br/>
+      <sub>Stop Loss, Take Profit, Support & Resistance</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="example/demo_gifs/zones.png" alt="Price Zones" width="240"/><br/>
+      <b>Price Zones</b><br/>
+      <sub>Demand and Supply zones with labels</sub>
+    </td>
+    <td align="center">
+      <img src="example/demo_gifs/draw.png" alt="Drawing Tools" width="240"/><br/>
+      <b>Drawing Tools</b><br/>
+      <sub>Fibonacci Retracement and Trend Lines</sub>
+    </td>
+  </tr>
+</table>
 
 </div>
 
