@@ -1,0 +1,171 @@
+PIPSEND CHARTS FLUTTER LICENSE
+
+
+Copyright (c) 2025 Pipsend
+Based on interactive_chart by Mehdi Zarepour (Copyright 2021)
+
+
+================================================================================
+DUAL LICENSE AGREEMENT
+================================================================================
+
+
+This software is available under a dual licensing model:
+
+
+1. FREE LICENSE (for non-commercial modifications)
+2. COMMERCIAL LICENSE (for commercial modifications)
+
+
+--------------------------------------------------------------------------------
+FREE LICENSE - TERMS AND CONDITIONS
+--------------------------------------------------------------------------------
+
+
+Permission is hereby granted, free of charge, to any person or organization
+obtaining a copy of this software and associated documentation files 
+(the "Software"), to use the Software subject to the following conditions:
+
+
+PERMITTED USES:
+✓ Use the Software in personal projects (free)
+✓ Use the Software in commercial applications (free)
+✓ Distribute the original, unmodified Software
+✓ Include the Software as a dependency in your projects
+✓ Use the Software for educational purposes
+✓ Use the Software for research and development
+
+
+RESTRICTIONS:
+✗ You MAY NOT modify, alter, or create derivative works of this Software
+  for the purpose of commercial distribution or sale
+✗ You MAY NOT sell, sublicense, or redistribute modified versions of this
+  Software for commercial purposes
+✗ You MAY NOT remove or alter any copyright notices, trademarks, or
+  attribution from the Software
+✗ You MAY NOT use the Software's name, trademarks, or branding to endorse
+  or promote derivative products without written permission
+
+
+CLARIFICATIONS:
+• You CAN use the unmodified Software in commercial applications (free)
+• You CAN make internal modifications for your own use (not for redistribution)
+• You CANNOT sell or redistribute modified versions commercially
+• For commercial modifications/redistribution, see COMMERCIAL LICENSE below
+
+
+ATTRIBUTION:
+You must include this license and copyright notice in all copies or
+substantial portions of the Software.
+
+
+--------------------------------------------------------------------------------
+COMMERCIAL LICENSE - FOR COMMERCIAL MODIFICATIONS
+--------------------------------------------------------------------------------
+
+
+If you wish to:
+• Modify this Software and distribute it commercially
+• Create derivative works for commercial purposes
+• Sell products based on modified versions of this Software
+• Redistribute modified versions under your own brand
+
+
+You must obtain a COMMERCIAL LICENSE.
+
+
+To obtain a commercial license, please contact:
+📧 Email: https://pipsend.com
+🌐 Website: https://github.com/ArcaTechCo/PipsendChartsFl
+
+
+Commercial licenses are available for:
+• Individual developers
+• Startups and small businesses
+• Enterprise organizations
+• OEM and white-label solutions
+
+
+--------------------------------------------------------------------------------
+DISCLAIMER OF WARRANTY
+--------------------------------------------------------------------------------
+
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+
+
+IN NO EVENT SHALL PIPSEND OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--------------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+--------------------------------------------------------------------------------
+
+
+This Software is based on and incorporates components from:
+
+
+• interactive_chart
+  Copyright 2021 Mehdi Zarepour
+  Licensed under MIT License
+  https://github.com/MassimoTambu/interactive_chart
+
+
+This component retains its original license. The original MIT License terms
+are included below for reference:
+
+
+MIT License (interactive_chart)
+--------------------------------
+Copyright (c) 2021 Mehdi Zarepour
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+--------------------------------------------------------------------------------
+QUESTIONS?
+--------------------------------------------------------------------------------
+
+
+For licensing questions or to obtain a commercial license:
+📧 https://pipsend.com
+🌐 https://github.com/ArcaTechCo/PipsendChartsFl
+💬 https://github.com/ArcaTechCo/PipsendChartsFl/discussions
+
+
+================================================================================
+END OF LICENSE
+================================================================================

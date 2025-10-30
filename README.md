@@ -1,0 +1,565 @@
+<div align="center">
+
+# 📊 Pipsend Charts Flutter
+
+**Professional Trading Charts for Flutter Applications**
+
+[![License](https://img.shields.io/badge/license-Dual%20License-blue.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-%E2%89%A5%202.0.0-02569B?logo=flutter)](https://flutter.dev)
+[![Pub Version](https://img.shields.io/badge/pub-v1.0.0-blue)](https://pub.dev)
+
+*A powerful, feature-rich charting library for Flutter with 12+ technical indicators, interactive overlays, and professional trading tools.*
+
+[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Examples](#-examples) • [License](#-license)
+
+</div>
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+### Technical Indicators
+<img src="example/demo_gifs/indicators.png" alt="Technical Indicators" width="800"/>
+
+*12+ professional indicators - RSI, MACD, Bollinger Bands, Stochastic, and more*
+
+### Trading Lines & Overlays
+<img src="example/demo_gifs/lines.png" alt="Trading Lines" width="800"/>
+
+*Interactive trading lines with drag & drop - Stop Loss, Take Profit, Support & Resistance*
+
+### Price Zones
+<img src="example/demo_gifs/zones.png" alt="Price Zones" width="800"/>
+
+*Demand and Supply zones with customizable colors and labels*
+
+### Drawing Tools
+<img src="example/demo_gifs/draw.png" alt="Drawing Tools" width="800"/>
+
+*Fibonacci Retracement and Trend Lines with angle display*
+
+</div>
+
+---
+
+## ✨ Features
+
+### 📈 Core Charting
+- **Candlestick Charts** - Professional OHLC visualization
+- **Pinch-to-Zoom** - Smooth, responsive zooming
+- **Pan & Scroll** - Intuitive navigation
+- **Dark/Light Mode** - Built-in theme support
+- **Customizable Styles** - Full control over appearance
+- **Volume Bars** - Integrated volume display
+- **Responsive** - Works on mobile, web, and desktop
+
+### 📊 Technical Indicators (12+)
+- **Moving Averages** - SMA(20, 50), EMA(12, 26)
+- **RSI** - Relative Strength Index with overbought/oversold zones
+- **MACD** - Moving Average Convergence Divergence with histogram
+- **Bollinger Bands** - Volatility bands with customizable periods
+- **Stochastic** - %K and %D lines with signal zones
+- **ATR** - Average True Range for volatility
+- **ADX** - Average Directional Index for trend strength
+- **CCI** - Commodity Channel Index
+- **Williams %R** - Momentum indicator
+- **OBV** - On-Balance Volume
+- **Volume** - Dedicated volume indicator
+
+### 🎯 Trading Tools
+- **Trading Lines** - Entry, Stop Loss, Take Profit, Support, Resistance
+- **Price Zones** - Demand, Supply, Support, Resistance zones
+- **Fibonacci Retracement** - Standard Fib levels with draggable points
+- **Trend Lines** - Diagonal lines with angle display
+- **All Draggable** - Interactive repositioning with callbacks
+
+### 🔧 Management System
+- **TradingLineManager** - Manage multiple trading lines
+- **PriceZoneManager** - Manage price zones
+- **FibonacciManager** - Manage Fibonacci retracements
+- **TrendLineManager** - Manage trend lines
+- **Event System** - Real-time updates and notifications
+- **Query API** - Find overlays by type, price, range
+
+---
+
+## 🚀 Installation
+
+Add to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  pipsend_charts: ^1.0.0
+```
+
+Then run:
+
+```bash
+flutter pub get
+```
+
+---
+
+## 🎯 Quick Start
+
+### Basic Chart
+
+```dart
+import 'package:pipsend_charts/pipsend_charts.dart';
+
+InteractiveChart(
+  candles: candleData,
+  style: ChartStyle(
+    priceGainColor: Colors.green,
+    priceLossColor: Colors.red,
+  ),
+)
+```
+
+### With Indicators
+
+```dart
+InteractiveChart(
+  candles: candleData,
+  indicators: [
+    RSIIndicator(period: 14),
+    MACDIndicator(fastPeriod: 12, slowPeriod: 26, signalPeriod: 9),
+    BollingerBandsIndicator(period: 20, stdDev: 2.0),
+  ],
+)
+```
+
+### With Trading Lines
+
+```dart
+final lineManager = TradingLineManager();
+
+// Add a stop loss
+lineManager.addLine(TradingLine(
+  id: 'sl_1',
+  price: 150.0,
+  type: TradingLineType.stopLoss,
+  options: TradingLineOptions(
+    title: 'Stop Loss',
+    draggable: true,
+    onPriceChanged: (newPrice) {
+      lineManager.updateLinePrice('sl_1', newPrice);
+    },
+  ),
+));
+
+InteractiveChart(
+  candles: candleData,
+  overlays: lineManager.lines,
+)
+```
+
+### With Price Zones
+
+```dart
+final zoneManager = PriceZoneManager();
+
+// Add a demand zone
+zoneManager.addZone(PriceZone(
+  id: 'demand_1',
+  minPrice: 140.0,
+  maxPrice: 145.0,
+  type: PriceZoneType.demand,
+  options: PriceZoneOptions(
+    label: 'Demand Zone',
+    draggable: true,
+    onRangeChanged: (newMin, newMax) {
+      zoneManager.updateZoneRange('demand_1', newMin, newMax);
+    },
+  ),
+));
+
+InteractiveChart(
+  candles: candleData,
+  overlays: zoneManager.zones,
+)
+```
+
+---
+
+## 📚 Documentation
+
+### Core Components
+
+#### InteractiveChart
+The main chart widget.
+
+```dart
+InteractiveChart(
+  candles: List<CandleData>,           // Required: OHLC data
+  indicators: List<Indicator>,         // Optional: Technical indicators
+  overlays: List<ChartOverlay>,        // Optional: Lines, zones, etc.
+  style: ChartStyle,                   // Optional: Visual customization
+  onTap: (TapDetails details) {},     // Optional: Tap callback
+  onXOffsetChanged: (details) {},     // Optional: Scroll callback
+)
+```
+
+#### CandleData
+OHLC data structure.
+
+```dart
+CandleData(
+  timestamp: DateTime.now().millisecondsSinceEpoch,
+  open: 100.0,
+  high: 105.0,
+  low: 98.0,
+  close: 103.0,
+  volume: 1000000.0,
+)
+```
+
+### Technical Indicators
+
+#### RSI (Relative Strength Index)
+```dart
+RSIIndicator(
+  period: 14,                          // Default: 14
+  style: RSIStyle(
+    lineColor: Colors.purple,
+    overboughtLevel: 70,
+    oversoldLevel: 30,
+  ),
+)
+```
+
+#### MACD
+```dart
+MACDIndicator(
+  fastPeriod: 12,
+  slowPeriod: 26,
+  signalPeriod: 9,
+  style: MACDStyle(
+    macdLineColor: Colors.blue,
+    signalLineColor: Colors.orange,
+    histogramPositiveColor: Colors.green,
+    histogramNegativeColor: Colors.red,
+  ),
+)
+```
+
+#### Bollinger Bands
+```dart
+BollingerBandsIndicator(
+  period: 20,
+  stdDev: 2.0,
+  style: BollingerBandsStyle(
+    upperBandColor: Colors.red,
+    middleBandColor: Colors.blue,
+    lowerBandColor: Colors.green,
+  ),
+)
+```
+
+### Trading Lines
+
+#### Types
+- `TradingLineType.entry` - Entry point
+- `TradingLineType.stopLoss` - Stop loss level
+- `TradingLineType.takeProfit` - Take profit target
+- `TradingLineType.support` - Support level
+- `TradingLineType.resistance` - Resistance level
+- `TradingLineType.custom` - Custom line
+
+#### Manager Methods
+```dart
+// Add line
+String? id = lineManager.addLine(line);
+
+// Update price
+lineManager.updateLinePrice(id, newPrice);
+
+// Remove line
+lineManager.removeLine(id);
+
+// Query
+List<TradingLine> lines = lineManager.getLinesByType(TradingLineType.stopLoss);
+
+// Clear all
+lineManager.clear();
+
+// Listen to events
+lineManager.addListener((event) {
+  print('Line ${event.type}: ${event.line.id}');
+});
+```
+
+### Price Zones
+
+#### Types
+- `PriceZoneType.support` - Support zone
+- `PriceZoneType.resistance` - Resistance zone
+- `PriceZoneType.demand` - Demand zone
+- `PriceZoneType.supply` - Supply zone
+- `PriceZoneType.custom` - Custom zone
+
+#### Manager Methods
+```dart
+// Add zone
+String? id = zoneManager.addZone(zone);
+
+// Update range
+zoneManager.updateZoneRange(id, newMin, newMax);
+
+// Remove zone
+zoneManager.removeZone(id);
+
+// Query
+List<PriceZone> zones = zoneManager.getZonesByType(PriceZoneType.demand);
+
+// Clear all
+zoneManager.clear();
+```
+
+### Fibonacci Retracement
+
+```dart
+final fibManager = FibonacciManager();
+
+fibManager.addFibonacci(FibonacciRetracement(
+  id: 'fib_1',
+  highPrice: 200.0,
+  lowPrice: 150.0,
+  options: FibonacciOptions(
+    showLabels: true,
+    showPercentages: true,
+    draggable: true,
+    onMoved: (newHigh, newLow) {
+      fibManager.updateFibonacciRange('fib_1', newHigh, newLow);
+    },
+  ),
+));
+
+InteractiveChart(
+  candles: candleData,
+  overlays: fibManager.fibonaccis,
+)
+```
+
+### Trend Lines
+
+```dart
+final trendManager = TrendLineManager();
+
+trendManager.addTrendLine(TrendLine(
+  id: 'trend_1',
+  startTime: startTimestamp,
+  startPrice: 100.0,
+  endTime: endTimestamp,
+  endPrice: 150.0,
+  options: TrendLineOptions(
+    draggable: true,
+    showAngle: true,
+    extendRight: false,
+    onMoved: (newStartTime, newStartPrice, newEndTime, newEndPrice) {
+      trendManager.updateTrendLinePoints('trend_1',
+        startTime: newStartTime,
+        startPrice: newStartPrice,
+        endTime: newEndTime,
+        endPrice: newEndPrice,
+      );
+    },
+  ),
+));
+
+InteractiveChart(
+  candles: candleData,
+  overlays: trendManager.trendLines,
+)
+```
+
+---
+
+## 💡 Examples
+
+Check out the comprehensive example app in the `example` folder:
+
+```bash
+cd example
+flutter run
+```
+
+The example includes:
+- **Indicators Tab** - All 12 technical indicators with toggles
+- **Trading Lines Tab** - Interactive trading lines with FABs
+- **Price Zones Tab** - Draggable price zones
+- **Drawing Tools Tab** - Fibonacci and trend lines
+
+---
+
+## 🎨 Customization
+
+### Chart Styles
+
+```dart
+ChartStyle(
+  // Colors
+  priceGainColor: Colors.green,
+  priceLossColor: Colors.red,
+  volumeColor: Colors.grey,
+  
+  // Grid
+  priceGridLineColor: Colors.grey.withOpacity(0.2),
+  timeGridLineColor: Colors.grey.withOpacity(0.2),
+  
+  // Labels
+  priceLabelStyle: TextStyle(color: Colors.white, fontSize: 12),
+  timeLabelStyle: TextStyle(color: Colors.white, fontSize: 12),
+  
+  // Volume
+  showVolume: true,
+  volumeHeightFactor: 0.2,
+  
+  // Selection
+  selectionHighlightColor: Colors.blue.withOpacity(0.2),
+)
+```
+
+### Indicator Styles
+
+Each indicator has its own style class:
+- `RSIStyle`
+- `MACDStyle`
+- `BollingerBandsStyle`
+- `StochasticStyle`
+- `ATRStyle`
+- And more...
+
+### Overlay Styles
+
+- `TradingLineStyle` - Line appearance
+- `PriceZoneStyle` - Zone colors and borders
+- `FibonacciStyle` - Fib level colors
+- `TrendLineStyle` - Trend line appearance
+
+---
+
+## 🔄 Event System
+
+All managers support event listeners:
+
+```dart
+// Trading Lines
+lineManager.addListener((event) {
+  switch (event.type) {
+    case TradingLineEventType.added:
+      print('Line added: ${event.line.id}');
+      break;
+    case TradingLineEventType.priceChanged:
+      print('Price changed: ${event.line.price}');
+      break;
+    case TradingLineEventType.removed:
+      print('Line removed');
+      break;
+  }
+});
+
+// Price Zones
+zoneManager.addListener((event) {
+  print('Zone event: ${event.type}');
+});
+
+// Fibonacci
+fibManager.addListener((event) {
+  print('Fibonacci event: ${event.type}');
+});
+
+// Trend Lines
+trendLineManager.addListener((event) {
+  print('Trend line event: ${event.type}');
+});
+```
+
+---
+
+## 📱 Platform Support
+
+| Platform | Supported |
+|----------|-----------|
+| iOS | ✅ |
+| Android | ✅ |
+| Web | ✅ |
+| macOS | ✅ |
+| Windows | ✅ |
+| Linux | ✅ |
+
+---
+
+## 📄 License
+
+This project is available under a **dual licensing model**:
+
+### Free License
+- ✅ Use in personal projects
+- ✅ Use in commercial applications (unmodified)
+- ✅ Educational and research use
+- ❌ Cannot sell or redistribute modified versions
+
+### Commercial License
+For modifying and redistributing the library commercially:
+- 🥉 **Startup**: $499/year
+- 🥈 **Business**: $1,999/year
+- 🥇 **Enterprise**: $4,999/year
+- 💎 **Perpetual**: Contact us
+
+See [LICENSE](LICENSE) and [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for details.
+
+**Contact**: https://pipsend.com
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! However, please note:
+- This is a commercially licensed project
+- Contributors must sign a CLA
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
+
+---
+
+## 💬 Support
+
+### Free License Users
+- 📚 [Documentation](https://github.com/ArcaTechCo/PipsendChartsFl/wiki)
+- 💬 [GitHub Discussions](https://github.com/ArcaTechCo/PipsendChartsFl/discussions)
+- 🐛 [GitHub Issues](https://github.com/ArcaTechCo/PipsendChartsFl/issues)
+
+### Commercial License Users
+- 📧 Priority Email Support
+- 💬 Private Slack Channel (Business+)
+- 📞 Video Calls (Enterprise)
+- 👨‍💼 Dedicated Account Manager (Enterprise)
+
+---
+
+## 🙏 Acknowledgments
+
+This project is based on [interactive_chart](https://github.com/MassimoTambu/interactive_chart) by Mehdi Zarepour.
+
+Special thanks to the Flutter community for their support and contributions.
+
+---
+
+## 📞 Contact
+
+**Pipsend**  
+📧 Email: https://pipsend.com  
+🌐 Website: https://github.com/ArcaTechCo/PipsendChartsFl  
+💬 Discussions: https://github.com/ArcaTechCo/PipsendChartsFl/discussions
+
+---
+
+<div align="center">
+
+**Made with ❤️ by Pipsend**
+
+[⭐ Star us on GitHub](https://github.com/ArcaTechCo/PipsendChartsFl) • [📦 View on pub.dev](https://pub.dev) • [📖 Documentation](https://github.com/ArcaTechCo/PipsendChartsFl/wiki)
+
+</div>
