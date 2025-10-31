@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'candle_data.dart';
@@ -10,6 +10,7 @@ import 'chart_style.dart';
 import 'painter_params.dart';
 import 'x_axis_offset_details.dart';
 import 'tap_details.dart';
+import 'interactive_chart_controller.dart';
 import 'overlays/overlay.dart';
 import 'overlays/trading_line.dart';
 import 'overlays/price_zone.dart';
@@ -89,6 +90,29 @@ class InteractiveChart extends StatefulWidget {
   /// (drawn below the main chart). Examples: SMA, EMA, RSI, MACD, etc.
   final List<Indicator> indicators;
 
+  /// Whether to show the Pipsend Charts watermark in the bottom-left corner.
+  ///
+  /// Defaults to true. Set to false to hide the watermark.
+  final bool showWatermark;
+
+  /// Whether to enable tap interaction to show candle details overlay.
+  ///
+  /// When true (default), tapping on the chart will show an overlay with
+  /// OHLC data, volume, and other candle information.
+  /// Set to false to disable this interaction.
+  final bool enableInteraction;
+
+  /// Whether to enable free camera movement.
+  ///
+  /// When false (default), scrolling is constrained to the available data range.
+  /// When true, allows unlimited scrolling beyond the data boundaries.
+  final bool freeCamera;
+
+  /// Controller for programmatic chart interactions.
+  ///
+  /// Use this to control the chart programmatically (e.g., jump to latest).
+  final InteractiveChartController? controller;
+
   const InteractiveChart({
     Key? key,
     required this.candles,
@@ -102,6 +126,10 @@ class InteractiveChart extends StatefulWidget {
     this.onXOffsetChanged,
     this.overlays = const [],
     this.indicators = const [],
+    this.showWatermark = true,
+    this.enableInteraction = true,
+    this.freeCamera = false,
+    this.controller,
   })  : this.style = style ?? const ChartStyle(),
         assert(candles.length >= 3,
             "InteractiveChart requires 3 or more CandleData"),
@@ -152,6 +180,33 @@ class _InteractiveChartState extends State<InteractiveChart> {
   bool _isResizingTrendLine = false; // Track if resizing a TrendLine
   bool _isResizingTrendStart = false; // Resizing start point of TrendLine
   bool _isResizingTrendEnd = false; // Resizing end point of TrendLine
+
+  @override
+  void initState() {
+    super.initState();
+    // Attach controller if provided
+    widget.controller?.attach(jumpToLatest);
+  }
+
+  @override
+  void dispose() {
+    // Detach controller
+    widget.controller?.detach();
+    super.dispose();
+  }
+
+  /// Jump to the latest candle (most recent data)
+  void jumpToLatest() {
+    if (_prevChartWidth == null) return;
+    
+    final w = _prevChartWidth!;
+    final count = w / _candleWidth;
+    final newOffset = (widget.candles.length - count) * _candleWidth;
+    
+    setState(() {
+      _startOffset = newOffset.clamp(0, _getMaxStartOffset(w, _candleWidth));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,10 +267,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
           return c.open ?? c.close;
         }
 
-        final maxPrice =
-            candlesInRange.map(highest).whereType<double>().reduce(max);
-        final minPrice =
-            candlesInRange.map(lowest).whereType<double>().reduce(min);
+        // Handle case when no candles are visible (free camera beyond data)
+        final priceValues = candlesInRange.map(highest).whereType<double>();
+        final maxPrice = priceValues.isNotEmpty 
+            ? priceValues.reduce(max)
+            : 100.0; // Default value when no data visible
+        
+        final lowValues = candlesInRange.map(lowest).whereType<double>();
+        final minPrice = lowValues.isNotEmpty
+            ? lowValues.reduce(min)
+            : 0.0; // Default value when no data visible
+        
         final maxVol = candlesInRange
             .map((c) => c.volume)
             .whereType<double>()
@@ -272,7 +334,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
           },
         );
 
-        return Listener(
+        final chartWidget = Listener(
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
               final dy = signal.scrollDelta.dy;
@@ -418,9 +480,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   return;
                 }
               }
-              setState(() {
-                _tapPosition = details.localPosition;
-              });
+              // Only show overlay info if interaction is enabled
+              if (widget.enableInteraction) {
+                setState(() {
+                  _tapPosition = details.localPosition;
+                });
+              }
             },
             onTapUp: (_) {
               // If overlay was selected but not dragged, deselect it
@@ -434,9 +499,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
               } else if (_draggedOverlay == null && widget.onTap != null) {
                 _fireOnTapEvent();
               }
-              setState(() {
-                _tapPosition = null;
-              });
+              // Clear tap position if interaction is enabled
+              if (widget.enableInteraction) {
+                setState(() {
+                  _tapPosition = null;
+                });
+              }
             },
             // Scale for both zoom and overlay dragging
             onScaleStart: (details) {
@@ -623,9 +691,32 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 _isResizingTrendEnd = false;
               });
             },
-            child: child,
+            child: widget.showWatermark
+                ? Stack(
+                    children: [
+                      child,
+                      Positioned(
+                        left: 0,
+                        bottom: 25,
+                        child: IgnorePointer(
+                          child: Opacity(
+                            opacity: 0.7,
+                            child: Image.asset(
+                              'packages/pipsend_charts/assets/img/logo.png',
+                              width: 80,
+                              height: 20,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : child,
           ),
         );
+        
+        return chartWidget;
       },
     );
   }
@@ -656,7 +747,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final zoomAdjustment = (currCount - prevCount) * candleWidth;
     final focalPointFactor = focalPoint.dx / w;
     startOffset -= zoomAdjustment * focalPointFactor;
-    startOffset = startOffset.clamp(0, _getMaxStartOffset(w, candleWidth));
+    // Only clamp offset if free camera is disabled
+    if (!widget.freeCamera) {
+      startOffset = startOffset.clamp(0, _getMaxStartOffset(w, candleWidth));
+    }
     // Fire candle width resize event
     if (candleWidth != _candleWidth) {
       widget.onCandleResize?.call(candleWidth);
@@ -676,10 +770,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
         _getMinCandleWidth(w),
         _getMaxCandleWidth(w),
       );
-      _startOffset = _startOffset.clamp(
-        0,
-        _getMaxStartOffset(w, _candleWidth),
-      );
+      // Only clamp offset if free camera is disabled
+      if (!widget.freeCamera) {
+        _startOffset = _startOffset.clamp(
+          0,
+          _getMaxStartOffset(w, _candleWidth),
+        );
+      }
     } else {
       // Default zoom level. Defaults to a 90 day chart, but configurable.
       // If data is shorter, we use the whole range.

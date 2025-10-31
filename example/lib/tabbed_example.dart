@@ -19,10 +19,13 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   final PriceZoneManager _zoneManager = PriceZoneManager();
   final FibonacciManager _fibonacciManager = FibonacciManager();
   final TrendLineManager _trendLineManager = TrendLineManager();
+  final InteractiveChartController _chartController = InteractiveChartController();
   
   // Settings
   bool _darkMode = true;
   bool _showVolume = true;
+  bool _showWatermark = true;
+  bool _enableInteraction = true;
   
   // Indicator toggles
   bool _showSMA20 = false;
@@ -42,7 +45,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _setupListeners();
     _setupExampleData();
   }
@@ -170,6 +173,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
               Tab(icon: Icon(Icons.horizontal_rule), text: 'Trading Lines'),
               Tab(icon: Icon(Icons.layers), text: 'Price Zones'),
               Tab(icon: Icon(Icons.trending_up), text: 'Drawing Tools'),
+              Tab(icon: Icon(Icons.settings), text: 'Settings'),
             ],
           ),
           actions: [
@@ -187,6 +191,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
             _buildTradingLinesTab(),
             _buildPriceZonesTab(),
             _buildDrawingToolsTab(),
+            _buildSettingsTab(),
           ],
         ),
       ),
@@ -242,6 +247,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: InteractiveChart(
+              showWatermark: true,
               candles: _data,
               indicators: [
                 if (_showSMA20) SMAIndicator(period: 20, style: SMAStyle(lineColor: Colors.blue)),
@@ -496,23 +502,31 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   }
 
   void _addDemandZone(BuildContext context) {
-    final currentPrice = _data.last.close ?? 150.0;
-    final minPrice = currentPrice * 0.90;
-    final maxPrice = currentPrice * 0.93;
+    // Calculate visible price range
+    final visibleData = _data.length > 90 ? _data.sublist(_data.length - 90) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    
+    // Use helper to calculate smart position (15% height, 35% from bottom)
+    final position = OverlayHelper.calculatePriceZonePosition(
+      minPrice: minVisiblePrice,
+      maxPrice: maxVisiblePrice,
+      heightPercent: 0.15,
+      centerPercent: 0.35,
+    );
     
     final zoneId = 'demand_${DateTime.now().millisecondsSinceEpoch}';
     
     _zoneManager.addZone(PriceZone(
       id: zoneId,
-      minPrice: minPrice,
-      maxPrice: maxPrice,
+      minPrice: position['minPrice']!,
+      maxPrice: position['maxPrice']!,
       type: PriceZoneType.demand,
       options: PriceZoneOptions(
         label: 'Demand Zone',
         showLabel: true,
         draggable: true,
         onRangeChanged: (newMin, newMax) {
-          // Actualizar el rango en el manager
           _zoneManager.updateZoneRange(zoneId, newMin, newMax);
         },
       ),
@@ -520,23 +534,31 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   }
 
   void _addSupplyZone(BuildContext context) {
-    final currentPrice = _data.last.close ?? 150.0;
-    final minPrice = currentPrice * 1.07;
-    final maxPrice = currentPrice * 1.10;
+    // Calculate visible price range
+    final visibleData = _data.length > 90 ? _data.sublist(_data.length - 90) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    
+    // Use helper to calculate smart position (15% height, 65% from bottom)
+    final position = OverlayHelper.calculatePriceZonePosition(
+      minPrice: minVisiblePrice,
+      maxPrice: maxVisiblePrice,
+      heightPercent: 0.15,
+      centerPercent: 0.65,
+    );
     
     final zoneId = 'supply_${DateTime.now().millisecondsSinceEpoch}';
     
     _zoneManager.addZone(PriceZone(
       id: zoneId,
-      minPrice: minPrice,
-      maxPrice: maxPrice,
+      minPrice: position['minPrice']!,
+      maxPrice: position['maxPrice']!,
       type: PriceZoneType.supply,
       options: PriceZoneOptions(
         label: 'Supply Zone',
         showLabel: true,
         draggable: true,
         onRangeChanged: (newMin, newMax) {
-          // Actualizar el rango en el manager
           _zoneManager.updateZoneRange(zoneId, newMin, newMax);
         },
       ),
@@ -640,16 +662,25 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   }
 
   void _addFibonacci(BuildContext context) {
-    final currentPrice = _data.last.close ?? 150.0;
-    final highPrice = currentPrice * 1.075;
-    final lowPrice = currentPrice * 0.925;
+    // Calculate visible price range
+    final visibleData = _data.length > 90 ? _data.sublist(_data.length - 90) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    
+    // Use helper to calculate smart position (40% height, centered)
+    final position = OverlayHelper.calculateFibonacciPosition(
+      minPrice: minVisiblePrice,
+      maxPrice: maxVisiblePrice,
+      heightPercent: 0.4,
+      centerPercent: 0.5,
+    );
     
     final fibId = 'fib_${DateTime.now().millisecondsSinceEpoch}';
     
     _fibonacciManager.addFibonacci(FibonacciRetracement(
       id: fibId,
-      highPrice: highPrice,
-      lowPrice: lowPrice,
+      highPrice: position['highPrice']!,
+      lowPrice: position['lowPrice']!,
       options: FibonacciOptions(
         showLabels: true,
         showPercentages: true,
@@ -662,17 +693,37 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   }
 
   void _addTrendLine(BuildContext context) {
-    final startIndex = _data.length > 60 ? _data.length - 60 : 0;
-    final endIndex = _data.length > 10 ? _data.length - 10 : _data.length - 1;
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    
+    // Calculate candle interval (assuming regular intervals)
+    final candleInterval = _data.length > 1 
+        ? _data.last.timestamp - _data[_data.length - 2].timestamp 
+        : 3600000; // 1 hour default
+    
+    // Use helper to calculate smart position (30% width, centered, 50% vertical)
+    final position = OverlayHelper.calculateTrendLinePosition(
+      visibleCandleCount: visibleCount,
+      minPrice: minVisiblePrice,
+      maxPrice: maxVisiblePrice,
+      latestTimestamp: _data.last.timestamp,
+      candleInterval: candleInterval,
+      widthPercent: 0.3,
+      centerPercent: 0.5,
+      verticalCenterPercent: 0.5,
+    );
     
     final trendId = 'trend_${DateTime.now().millisecondsSinceEpoch}';
     
     _trendLineManager.addTrendLine(TrendLine(
       id: trendId,
-      startTime: _data[startIndex].timestamp,
-      startPrice: (_data[startIndex].low ?? 0) * 0.98,
-      endTime: _data[endIndex].timestamp,
-      endPrice: (_data[endIndex].high ?? 0) * 1.02,
+      startTime: position['startTime']!.toInt(),
+      startPrice: position['startPrice']!,
+      endTime: position['endTime']!.toInt(),
+      endPrice: position['endPrice']!,
       style: const TrendLineStyle(
         color: Color(0xFF4CAF50),
         lineWidth: 2.0,
@@ -692,6 +743,106 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         },
       ),
     ));
+  }
+
+  // ============================================================================
+  // TAB 5: SETTINGS & CONTROLS
+  // ============================================================================
+  Widget _buildSettingsTab() {
+    return Stack(
+      children: [
+        Column(
+          children: [
+            // Info Panel
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.blue.shade50,
+              child: Row(
+                children: [
+                  const Icon(Icons.settings, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Chart Settings & Controls',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Watermark: ${_showWatermark ? "ON" : "OFF"} • Interaction: ${_enableInteraction ? "ON" : "OFF"}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Chart
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: InteractiveChart(
+                  candles: _data,
+                  controller: _chartController,
+                  showWatermark: _showWatermark,
+                  enableInteraction: _enableInteraction,
+                  style: ChartStyle(
+                    priceGainColor: Colors.green,
+                    priceLossColor: Colors.red,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        // Floating Action Buttons
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Toggle Watermark
+              FloatingActionButton(
+                heroTag: 'toggle_watermark',
+                onPressed: () => setState(() => _showWatermark = !_showWatermark),
+                tooltip: _showWatermark ? 'Hide Watermark' : 'Show Watermark',
+                backgroundColor: _showWatermark ? Colors.blue : Colors.grey,
+                child: Icon(_showWatermark ? Icons.branding_watermark : Icons.branding_watermark_outlined),
+              ),
+              const SizedBox(height: 12),
+              
+              // Toggle Interaction
+              FloatingActionButton(
+                heroTag: 'toggle_interaction',
+                onPressed: () => setState(() => _enableInteraction = !_enableInteraction),
+                tooltip: _enableInteraction ? 'Disable Interaction' : 'Enable Interaction',
+                backgroundColor: _enableInteraction ? Colors.green : Colors.grey,
+                child: Icon(_enableInteraction ? Icons.touch_app : Icons.touch_app_outlined),
+              ),
+              const SizedBox(height: 12),
+              
+              // Jump to Latest
+              FloatingActionButton(
+                heroTag: 'jump_latest',
+                onPressed: () => _chartController.jumpToLatest(),
+                tooltip: 'Jump to Latest',
+                backgroundColor: Colors.orange,
+                child: const Icon(Icons.skip_next),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   // ============================================================================

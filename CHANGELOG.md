@@ -1,3 +1,67 @@
+## 1.0.2
+
+**🎨 UX Improvements & New Controls**
+
+### 🚀 New Features
+
+#### Smart Overlay Positioning
+* **OverlayHelper** - Intelligent initial positioning for overlays:
+  * `calculateTrendLinePosition()` - Smart trend line placement (30% width, centered)
+  * `calculateFibonacciPosition()` - Smart Fibonacci placement (40% height, centered)
+  * `calculatePriceZonePosition()` - Smart zone placement (15% height, customizable)
+  * `calculateTradingLinePrice()` - Smart line price calculation
+* **Customizable Parameters** - Control width, height, and position percentages
+* **Viewport-based** - Positions calculated from visible chart data
+
+#### Chart Controller
+* **InteractiveChartController** - Programmatic chart control:
+  * `jumpToLatest()` - Scroll to most recent candle
+  * `isAttached` - Check controller attachment status
+* **Real-time Support** - Perfect for live data feeds
+* **Auto-scroll** - Automatic scroll to latest data when new candles added
+
+#### Branding & Customization
+* **Interaction Control** - `enableInteraction` parameter:
+  * Toggle tap overlay showing OHLC data
+  * Useful for embedded charts or custom interactions
+
+#### Camera Controls
+* **Free Camera Mode** - `freeCamera` parameter:
+  * Unlimited horizontal scrolling beyond data boundaries
+  * Useful for technical analysis and future data preparation
+  * Prevents errors when scrolling past data range
+  * Note: Vertical axis (prices) auto-adjusts to visible data (standard behavior)
+
+### 🎨 UI/UX Improvements
+* **Settings Tab** - New tab in example app:
+  * Toggle watermark on/off
+  * Toggle tap interaction
+  * Jump to latest button
+  * Floating action buttons for quick access
+* **Improved Example** - Updated tabbed example with all new features
+* **Better Positioning** - Overlays now created at sensible sizes and locations
+
+### 🐛 Bug Fixes
+* Fixed `StateError (Bad state: No element)` when scrolling beyond data with free camera
+* Fixed watermark being drawn behind volume bars and indicators
+* Fixed overlays being created too large or in unexpected locations
+* Fixed Fibonacci retracements being difficult to select for resizing
+
+### 📚 Documentation
+* **Updated IMPLEMENTATION_GUIDE.md**:
+  * Chart Controller section with examples
+  * Free Camera Mode documentation
+  * Advanced Features section
+  * Real-time data updates guide
+  * Updated best practices (8 practices, up from 5)
+* **Complete Feature List** - All parameters and methods documented
+* **Code Examples** - Practical examples for all new features
+
+### 💥 Breaking Changes
+* None - Fully backward compatible with 1.0.1
+
+---
+
 ## 1.0.1
 
 * Fix README screenshots to use absolute GitHub URLs for pub.dev compatibility

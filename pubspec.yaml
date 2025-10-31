@@ -1,6 +1,6 @@
 name: pipsend_charts
 description: Advanced financial charting library with built-in technical indicators - Simple, powerful.
-version: 1.0.1
+version: 1.0.2
 repository: https://github.com/ArcaTechCo/PipsendChartsFl
 homepage: https://pipsend.com/charts#flutter
 
@@ -17,3 +17,7 @@ dev_dependencies:
   flutter_lints:
   flutter_test:
     sdk: flutter
+
+flutter:
+  assets:
+    - assets/img/logo.png

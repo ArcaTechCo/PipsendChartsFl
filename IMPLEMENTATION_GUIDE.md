@@ -11,7 +11,7 @@ Complete guide for implementing Pipsend Charts Flutter in your application.
 ```yaml
 # pubspec.yaml
 dependencies:
-  pipsend_charts: ^1.0.1
+  pipsend_charts: ^1.0.2
 ```
 
 ### 2. Install and Import
@@ -275,15 +275,34 @@ PriceZoneType.custom      // Custom zone
 
 ## ✏️ Drawing Tools
 
+### Smart Positioning with OverlayHelper
+
+Use `OverlayHelper` to calculate intelligent initial positions for overlays:
+
+```dart
+// Calculate visible price range
+final visibleData = data.length > 90 ? data.sublist(data.length - 90) : data;
+final minPrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+final maxPrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+```
+
 ### Fibonacci Retracement
 
 ```dart
 final fibManager = FibonacciManager();
 
+// Calculate smart position (40% height, centered)
+final position = OverlayHelper.calculateFibonacciPosition(
+  minPrice: minVisiblePrice,
+  maxPrice: maxVisiblePrice,
+  heightPercent: 0.4,  // 40% of visible range
+  centerPercent: 0.5,  // Centered vertically
+);
+
 fibManager.addFibonacci(FibonacciRetracement(
   id: 'fib_1',
-  highPrice: 200.0,
-  lowPrice: 150.0,
+  highPrice: position['highPrice']!,
+  lowPrice: position['lowPrice']!,
   options: FibonacciOptions(
     draggable: true,
     onMoved: (high, low) {
@@ -298,12 +317,29 @@ fibManager.addFibonacci(FibonacciRetracement(
 ```dart
 final trendManager = TrendLineManager();
 
+// Calculate candle interval
+final candleInterval = data.length > 1 
+    ? data.last.timestamp - data[data.length - 2].timestamp 
+    : 3600000;
+
+// Calculate smart position (30% width, centered)
+final position = OverlayHelper.calculateTrendLinePosition(
+  visibleCandleCount: 90,
+  minPrice: minVisiblePrice,
+  maxPrice: maxVisiblePrice,
+  latestTimestamp: data.last.timestamp,
+  candleInterval: candleInterval,
+  widthPercent: 0.3,           // 30% of visible width
+  centerPercent: 0.5,          // Centered horizontally
+  verticalCenterPercent: 0.5,  // Centered vertically
+);
+
 trendManager.addTrendLine(TrendLine(
   id: 'trend_1',
-  startTime: startTimestamp,
-  startPrice: 140.0,
-  endTime: endTimestamp,
-  endPrice: 180.0,
+  startTime: position['startTime']!.toInt(),
+  startPrice: position['startPrice']!,
+  endTime: position['endTime']!.toInt(),
+  endPrice: position['endPrice']!,
   options: TrendLineOptions(
     draggable: true,
     showAngle: true,
@@ -314,6 +350,34 @@ trendManager.addTrendLine(TrendLine(
         endTime: endTime,
         endPrice: endPrice,
       );
+    },
+  ),
+));
+```
+
+### Price Zones with Smart Positioning
+
+```dart
+final zoneManager = PriceZoneManager();
+
+// Calculate smart position (15% height, 35% from bottom)
+final position = OverlayHelper.calculatePriceZonePosition(
+  minPrice: minVisiblePrice,
+  maxPrice: maxVisiblePrice,
+  heightPercent: 0.15,  // 15% of visible range
+  centerPercent: 0.35,  // 35% from bottom (demand zone)
+);
+
+zoneManager.addZone(PriceZone(
+  id: 'demand_1',
+  minPrice: position['minPrice']!,
+  maxPrice: position['maxPrice']!,
+  type: PriceZoneType.demand,
+  options: PriceZoneOptions(
+    label: 'Demand Zone',
+    draggable: true,
+    onRangeChanged: (min, max) {
+      zoneManager.updateZoneRange('demand_1', min, max);
     },
   ),
 ));
@@ -402,6 +466,166 @@ Future<List<CandleData>> loadCandles() async {
 
 ---
 
+## ⚙️ Configuration Options
+
+### Watermark
+
+Control the Pipsend Charts logo visibility:
+
+```dart
+// Show watermark (default)
+InteractiveChart(
+  candles: data,
+  showWatermark: true,
+)
+
+// Hide watermark
+InteractiveChart(
+  candles: data,
+  showWatermark: false,
+)
+```
+
+### Tap Interaction
+
+Control the tap overlay that shows OHLC data:
+
+```dart
+// Enable tap interaction (default)
+InteractiveChart(
+  candles: data,
+  enableInteraction: true,  // Shows overlay on tap
+)
+
+// Disable tap interaction
+InteractiveChart(
+  candles: data,
+  enableInteraction: false,  // No overlay on tap
+)
+```
+
+**Use Cases for Disabling Interaction:**
+- Embedded charts in dashboards
+- Read-only chart displays
+- Performance optimization for multiple charts
+- Custom interaction handling
+
+### Chart Controller
+
+Control the chart programmatically:
+
+```dart
+class ControlledChart extends StatefulWidget {
+  @override
+  _ControlledChartState createState() => _ControlledChartState();
+}
+
+class _ControlledChartState extends State<ControlledChart> {
+  final _controller = InteractiveChartController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: () => _controller.jumpToLatest(),
+          child: Text('Jump to Latest'),
+        ),
+        Expanded(
+          child: InteractiveChart(
+            candles: data,
+            controller: _controller,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+**Controller Methods:**
+- `jumpToLatest()` - Scroll to most recent candle
+- `isAttached` - Check if controller is attached to a chart
+
+### Free Camera Mode
+
+Enable unlimited horizontal scrolling:
+
+```dart
+InteractiveChart(
+  candles: data,
+  freeCamera: true,  // Allow scrolling beyond data boundaries
+)
+```
+
+**Use Cases:**
+- Technical analysis requiring space beyond data
+- Preparing for future data
+- Custom chart layouts
+
+---
+
+## 🚀 Advanced Features
+
+### Real-time Data Updates
+
+The chart automatically detects when new candles are added:
+
+```dart
+class RealtimeChart extends StatefulWidget {
+  @override
+  _RealtimeChartState createState() => _RealtimeChartState();
+}
+
+class _RealtimeChartState extends State<RealtimeChart> {
+  List<CandleData> _data = [];
+  final _controller = InteractiveChartController();
+  bool _autoScroll = true;
+
+  void _addNewCandle(CandleData newCandle) {
+    setState(() {
+      _data.add(newCandle);
+    });
+    
+    // Auto-scroll to latest if enabled
+    if (_autoScroll) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _controller.jumpToLatest();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InteractiveChart(
+      candles: _data,
+      controller: _controller,
+    );
+  }
+}
+```
+
+### Complete Feature List
+
+**Chart Configuration:**
+- ✅ `showWatermark` - Toggle Pipsend Charts logo
+- ✅ `enableInteraction` - Enable/disable tap overlay
+- ✅ `freeCamera` - Unlimited horizontal scrolling
+- ✅ `controller` - Programmatic control
+- ✅ `initialVisibleCandleCount` - Default zoom level
+
+**Overlay Helpers:**
+- ✅ `OverlayHelper.calculateTrendLinePosition()` - Smart trend line placement
+- ✅ `OverlayHelper.calculateFibonacciPosition()` - Smart Fibonacci placement
+- ✅ `OverlayHelper.calculatePriceZonePosition()` - Smart zone placement
+- ✅ `OverlayHelper.calculateTradingLinePrice()` - Smart line price
+
+**Controller Methods:**
+- ✅ `jumpToLatest()` - Scroll to most recent data
+- ✅ `isAttached` - Check controller status
+
+---
+
 ## 🎯 Best Practices
 
 1. **Always call setState after manager updates**
@@ -409,6 +633,9 @@ Future<List<CandleData>> loadCandles() async {
 3. **Use unique IDs for overlays**
 4. **Limit candle data for performance (max 500)**
 5. **Handle errors when loading data**
+6. **Use OverlayHelper for consistent overlay placement**
+7. **Implement auto-scroll for real-time data**
+8. **Use controller for programmatic navigation**
 
 ---
 

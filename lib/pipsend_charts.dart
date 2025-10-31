@@ -1,5 +1,6 @@
 export 'src/candle_data.dart';
 export 'src/interactive_chart.dart';
+export 'src/interactive_chart_controller.dart';
 export 'src/chart_style.dart';
 export 'src/x_axis_offset_details.dart';
 export 'src/tap_details.dart';
@@ -41,6 +42,7 @@ export 'src/indicators/obv_indicator.dart';
 
 // Overlays & Trading Lines
 export 'src/overlays/overlay.dart';
+export 'src/overlays/overlay_helper.dart';
 export 'src/overlays/trading_line.dart';
 export 'src/overlays/trading_line_type.dart';
 export 'src/overlays/trading_line_style.dart';
