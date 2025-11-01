@@ -24,6 +24,14 @@ class PriceZone extends ChartOverlay {
   /// Display and interaction options.
   final PriceZoneOptions options;
   
+  /// Optional: Start timestamp (milliseconds since epoch).
+  /// If null, zone extends from the left edge of the chart.
+  final int? startTime;
+
+  /// Optional: End timestamp (milliseconds since epoch).
+  /// If null, zone extends to the right edge of the chart.
+  final int? endTime;
+  
   PriceZone({
     String? id,
     required this.minPrice,
@@ -32,6 +40,8 @@ class PriceZone extends ChartOverlay {
     PriceZoneStyle? style,
     PriceZoneOptions? options,
     bool visible = true,
+    this.startTime,
+    this.endTime,
   })  : assert(maxPrice > minPrice, 'maxPrice must be greater than minPrice'),
         this.style = style ?? PriceZoneStyle.fromType(type),
         this.options = options ?? const PriceZoneOptions(),
@@ -52,11 +62,42 @@ class PriceZone extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
     
+    // Calculate X coordinates based on timestamps
+    double startX = 0;
+    double endX = params.chartWidth;
+    
+    if (startTime != null || endTime != null) {
+      final visibleStartTime = params.candles.first.timestamp;
+      final visibleEndTime = params.candles.last.timestamp;
+      
+      // Check if zone is completely outside visible range
+      if (startTime != null && startTime! > visibleEndTime) return;
+      if (endTime != null && endTime! < visibleStartTime) return;
+      
+      if (startTime != null) {
+        final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime!);
+        if (startIndex >= 0) {
+          startX = startIndex * params.candleWidth;
+        }
+      }
+      
+      if (endTime != null) {
+        final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime!);
+        if (endIndex >= 0) {
+          endX = endIndex * params.candleWidth;
+        }
+      }
+      
+      // Clip to visible range
+      startX = startX.clamp(0.0, params.chartWidth);
+      endX = endX.clamp(0.0, params.chartWidth);
+    }
+    
     final minY = params.fitPrice(maxPrice); // Y is inverted
     final maxY = params.fitPrice(minPrice);
     
     // Draw filled rectangle
-    final rect = Rect.fromLTRB(0, minY, params.chartWidth, maxY);
+    final rect = Rect.fromLTRB(startX, minY, endX, maxY);
     final fillPaint = Paint()
       ..color = style.fillColor
       ..style = PaintingStyle.fill;
@@ -184,6 +225,8 @@ class PriceZone extends ChartOverlay {
       style: style,
       options: options,
       visible: visible,
+      startTime: startTime,
+      endTime: endTime,
     );
   }
   
@@ -196,6 +239,8 @@ class PriceZone extends ChartOverlay {
     PriceZoneStyle? style,
     PriceZoneOptions? options,
     bool? visible,
+    int? startTime,
+    int? endTime,
   }) {
     return PriceZone(
       id: id ?? this.id,
@@ -205,6 +250,8 @@ class PriceZone extends ChartOverlay {
       style: style ?? this.style,
       options: options ?? this.options,
       visible: visible ?? this.visible,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
     );
   }
   

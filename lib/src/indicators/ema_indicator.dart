@@ -79,9 +79,15 @@ class EMAIndicator extends Indicator {
 
       if (currentValue == null || nextValue == null) continue;
 
-      final x1 = params.xShift + i * params.candleWidth;
+      // Find the index in visible candles using timestamp
+      final currentIndex = params.candles.indexWhere((c) => c.timestamp == values[i].timestamp);
+      final nextIndex = params.candles.indexWhere((c) => c.timestamp == values[i + 1].timestamp);
+      
+      if (currentIndex < 0 || nextIndex < 0) continue;
+
+      final x1 = currentIndex * params.candleWidth;
       final y1 = params.fitPrice(currentValue);
-      final x2 = params.xShift + (i + 1) * params.candleWidth;
+      final x2 = nextIndex * params.candleWidth;
       final y2 = params.fitPrice(nextValue);
 
       canvas.drawLine(Offset(x1, y1), Offset(x2, y2), paint);

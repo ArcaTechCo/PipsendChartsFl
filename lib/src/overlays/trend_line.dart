@@ -23,18 +23,22 @@ class TrendLine extends ChartOverlay {
 
   TrendLine({
     String? id,
-    required this.startTime,
-    required this.startPrice,
-    required this.endTime,
-    required this.endPrice,
+    required int startTime,
+    required double startPrice,
+    required int endTime,
+    required double endPrice,
     TrendLineStyle? style,
     TrendLineOptions? options,
     bool visible = true,
-  })  : assert(endTime > startTime, 'endTime must be greater than startTime'),
+  })  : // Normalize points: ensure start is always before end
+        startTime = startTime <= endTime ? startTime : endTime,
+        startPrice = startTime <= endTime ? startPrice : endPrice,
+        endTime = startTime <= endTime ? endTime : startTime,
+        endPrice = startTime <= endTime ? endPrice : startPrice,
         style = style ?? const TrendLineStyle(),
         options = options ?? const TrendLineOptions(),
         super(
-          id: id ?? 'trend_${startTime}_${endTime}',
+          id: id ?? 'trend_${math.min(startTime, endTime)}_${math.max(startTime, endTime)}',
           interactive: (options ?? const TrendLineOptions()).draggable,
           visible: visible,
         );
@@ -55,9 +59,9 @@ class TrendLine extends ChartOverlay {
     
     if (startIndex < 0 || endIndex < 0) return 0.0;
     
-    final x1 = params.xShift + startIndex * params.candleWidth;
+    final x1 = startIndex * params.candleWidth;
     final y1 = params.fitPrice(startPrice);
-    final x2 = params.xShift + endIndex * params.candleWidth;
+    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     final dx = x2 - x1;
@@ -81,7 +85,7 @@ class TrendLine extends ChartOverlay {
     // Start point
     final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
     if (startIndex >= 0) {
-      x1 = params.xShift + startIndex * params.candleWidth;
+      x1 = startIndex * params.candleWidth;
       y1 = params.fitPrice(startPrice);
     } else {
       // If start is before visible range and extendRight is true
@@ -99,7 +103,7 @@ class TrendLine extends ChartOverlay {
     // End point
     final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
     if (endIndex >= 0) {
-      x2 = params.xShift + endIndex * params.candleWidth;
+      x2 = endIndex * params.candleWidth;
       y2 = params.fitPrice(endPrice);
     } else {
       // If end is after visible range and extendRight is true
@@ -112,6 +116,12 @@ class TrendLine extends ChartOverlay {
       } else {
         return; // Don't draw if end is not visible and not extending
       }
+    }
+    
+    // Check if line is completely outside visible range
+    // Don't draw if both points are before or after the visible range
+    if (startTime > visibleEndTime || endTime < visibleStartTime) {
+      return; // Line is completely outside visible range
     }
     
     // Extend line if options are enabled
@@ -254,9 +264,9 @@ class TrendLine extends ChartOverlay {
     
     if (startIndex < 0 || endIndex < 0) return false;
     
-    final x1 = params.xShift + startIndex * params.candleWidth;
+    final x1 = startIndex * params.candleWidth;
     final y1 = params.fitPrice(startPrice);
-    final x2 = params.xShift + endIndex * params.candleWidth;
+    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     // Calculate distance from point to line segment
@@ -273,7 +283,7 @@ class TrendLine extends ChartOverlay {
     final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
     if (startIndex < 0) return false;
     
-    final x = params.xShift + startIndex * params.candleWidth;
+    final x = startIndex * params.candleWidth;
     final y = params.fitPrice(startPrice);
     
     final handleSize = 20.0; // Larger touch area
@@ -290,7 +300,7 @@ class TrendLine extends ChartOverlay {
     final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
     if (endIndex < 0) return false;
     
-    final x = params.xShift + endIndex * params.candleWidth;
+    final x = endIndex * params.candleWidth;
     final y = params.fitPrice(endPrice);
     
     final handleSize = 20.0; // Larger touch area

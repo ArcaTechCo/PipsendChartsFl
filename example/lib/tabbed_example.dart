@@ -79,11 +79,20 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
     // Setup example trading lines
     final currentPrice = _data.last.close ?? 150.0;
     
+    // Calculate timestamps for anchored overlays
+    // Use last 40% of visible data for overlays
+    final startIndex = (_data.length * 0.6).toInt();
+    final endIndex = _data.length - 1;
+    final startTime = _data[startIndex].timestamp;
+    final endTime = _data[endIndex].timestamp;
+    
     final entryId = 'entry_1';
     _lineManager.addLine(TradingLine(
       id: entryId,
       price: currentPrice,
       type: TradingLineType.entry,
+      startTime: startTime,  // Anchor to specific time range
+      endTime: endTime,
       options: TradingLineOptions(
         title: 'Entry',
         showPrice: true,
@@ -101,6 +110,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
       minPrice: currentPrice * 0.92,
       maxPrice: currentPrice * 0.95,
       type: PriceZoneType.demand,
+      startTime: startTime,  // Anchor to specific time range
+      endTime: endTime,
       options: PriceZoneOptions(
         label: 'Demand Zone',
         showLabel: true,
@@ -117,6 +128,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
       id: fibId,
       highPrice: currentPrice * 1.075,
       lowPrice: currentPrice * 0.925,
+      startTime: startTime,  // Anchor to specific time range
+      endTime: endTime,
       options: FibonacciOptions(
         showLabels: true,
         showPercentages: true,
@@ -128,16 +141,16 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
     ));
 
     // Setup example Trend Line
-    final startIndex = _data.length > 60 ? _data.length - 60 : 0;
-    final endIndex = _data.length > 10 ? _data.length - 10 : _data.length - 1;
+    final trendStartIndex = _data.length > 60 ? _data.length - 60 : 0;
+    final trendEndIndex = _data.length > 10 ? _data.length - 10 : _data.length - 1;
     
     final trendId = 'trend_1';
     _trendLineManager.addTrendLine(TrendLine(
       id: trendId,
-      startTime: _data[startIndex].timestamp,
-      startPrice: (_data[startIndex].low ?? 0) * 0.98,
-      endTime: _data[endIndex].timestamp,
-      endPrice: (_data[endIndex].high ?? 0) * 1.02,
+      startTime: _data[trendStartIndex].timestamp,
+      startPrice: (_data[trendStartIndex].low ?? 0) * 0.98,
+      endTime: _data[trendEndIndex].timestamp,
+      endPrice: (_data[trendEndIndex].high ?? 0) * 1.02,
       style: const TrendLineStyle(color: Color(0xFF4CAF50), lineWidth: 2.0),
       options: TrendLineOptions(
         draggable: true,

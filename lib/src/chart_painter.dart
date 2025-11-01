@@ -24,6 +24,7 @@ class ChartPainter extends CustomPainter {
   final List<Indicator> indicators;
   final ChartOverlay? draggedOverlay;
   final double? draggedPrice;
+  final double? draggedInitialPrice;
   final Offset? draggedPosition;
   final bool isResizingTop;
   final bool isResizingBottom;
@@ -41,6 +42,7 @@ class ChartPainter extends CustomPainter {
     this.indicators = const [],
     this.draggedOverlay,
     this.draggedPrice,
+    this.draggedInitialPrice,
     this.draggedPosition,
     this.isResizingTop = false,
     this.isResizingBottom = false,
@@ -56,22 +58,22 @@ class ChartPainter extends CustomPainter {
     _drawTimeLabels(canvas, params);
     _drawPriceGridAndLabels(canvas, params);
 
-    // Draw prices, volumes & trend line
+    // Draw prices, volumes & overlays with translate
     canvas.save();
-    canvas.clipRect(Offset.zero & Size(params.chartWidth, params.chartHeight));
-    // canvas.drawRect(
-    //   // apply yellow tint to clipped area (for debugging)
-    //   Offset.zero & Size(params.chartWidth, params.chartHeight),
-    //   Paint()..color = Colors.yellow[100]!,
-    // );
     canvas.translate(params.xShift, 0);
+    
+    // Draw candles (clipped)
+    canvas.save();
+    canvas.clipRect(Offset(-params.xShift, 0) & Size(params.chartWidth, params.chartHeight));
     for (int i = 0; i < params.candles.length; i++) {
       _drawSingleDay(canvas, params, i);
     }
     canvas.restore();
-
-    // Draw overlays (trading lines, etc.)
+    
+    // Draw overlays (not clipped, so labels can extend outside)
     _drawOverlays(canvas, params);
+    
+    canvas.restore();
 
     // Draw indicators
     _drawIndicators(canvas, params);
@@ -104,12 +106,14 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is PriceZone) {
             // Handle resize vs drag
             final PriceZone draggedZone;
-            const minZoneHeight = 0.2; // Minimum height as percentage of zone
+            // Minimum height: 0.1% of visible price range
+            final visiblePriceRange = params.maxPrice - params.minPrice;
+            final minZoneHeight = visiblePriceRange * 0.001;
             
             if (isResizingTop) {
               // Resizing top edge (maxPrice)
               final newMaxPrice = draggedPrice!;
-              final minAllowedMaxPrice = overlay.minPrice + (overlay.maxPrice - overlay.minPrice) * minZoneHeight;
+              final minAllowedMaxPrice = overlay.minPrice + minZoneHeight;
               draggedZone = overlay.withRange(
                 overlay.minPrice,
                 newMaxPrice > minAllowedMaxPrice ? newMaxPrice : minAllowedMaxPrice,
@@ -117,14 +121,16 @@ class ChartPainter extends CustomPainter {
             } else if (isResizingBottom) {
               // Resizing bottom edge (minPrice)
               final newMinPrice = draggedPrice!;
-              final maxAllowedMinPrice = overlay.maxPrice - (overlay.maxPrice - overlay.minPrice) * minZoneHeight;
+              final maxAllowedMinPrice = overlay.maxPrice - minZoneHeight;
               draggedZone = overlay.withRange(
                 newMinPrice < maxAllowedMinPrice ? newMinPrice : maxAllowedMinPrice,
                 overlay.maxPrice,
               );
             } else {
               // Regular drag - move entire zone
-              final offset = draggedPrice! - overlay.centerPrice;
+              // Use initial price to calculate offset, not current price
+              final initialPrice = draggedInitialPrice ?? draggedPrice!;
+              final offset = draggedPrice! - initialPrice;
               draggedZone = overlay.withRange(
                 overlay.minPrice + offset,
                 overlay.maxPrice + offset,
@@ -137,13 +143,14 @@ class ChartPainter extends CustomPainter {
             
             if (isResizingFibonacci) {
               // Resizing one edge
+              // Minimum height: 0.1% of visible price range
+              final visiblePriceRange = params.maxPrice - params.minPrice;
+              final minHeight = visiblePriceRange * 0.001;
+              
               if (isResizingTop) {
                 // Resizing top edge (highPrice)
                 final newHighPrice = draggedPrice!;
                 final newLowPrice = overlay.lowPrice;
-                // Ensure minimum height
-                final originalHeight = overlay.highPrice - overlay.lowPrice;
-                final minHeight = (originalHeight * 0.2).clamp(1.0, double.infinity);
                 final minAllowedHighPrice = newLowPrice + minHeight;
                 draggedFib = overlay.withPrices(
                   newHighPrice > minAllowedHighPrice ? newHighPrice : minAllowedHighPrice,
@@ -153,9 +160,6 @@ class ChartPainter extends CustomPainter {
                 // Resizing bottom edge (lowPrice)
                 final newHighPrice = overlay.highPrice;
                 final newLowPrice = draggedPrice!;
-                // Ensure minimum height
-                final originalHeight = overlay.highPrice - overlay.lowPrice;
-                final minHeight = (originalHeight * 0.2).clamp(1.0, double.infinity);
                 final maxAllowedLowPrice = newHighPrice - minHeight;
                 draggedFib = overlay.withPrices(
                   newHighPrice,
@@ -164,7 +168,9 @@ class ChartPainter extends CustomPainter {
               }
             } else {
               // Move entire Fibonacci retracement
-              final offset = draggedPrice! - ((overlay.highPrice + overlay.lowPrice) / 2);
+              // Use initial price to calculate offset, not current price
+              final initialPrice = draggedInitialPrice ?? draggedPrice!;
+              final offset = draggedPrice! - initialPrice;
               draggedFib = overlay.withPrices(
                 overlay.highPrice + offset,
                 overlay.lowPrice + offset,
@@ -521,7 +527,15 @@ class ChartPainter extends CustomPainter {
     if (indicators.isEmpty) return;
 
     canvas.save();
-    canvas.clipRect(Offset.zero & Size(params.chartWidth, params.chartHeight));
+    canvas.translate(params.xShift, 0);
+    
+    // Clip with extra padding to prevent lines from being cut off
+    // Use a larger clip area to account for line width and anti-aliasing
+    final clipPadding = 10.0;
+    canvas.clipRect(
+      Offset(-params.xShift - clipPadding, -clipPadding) & 
+      Size(params.chartWidth + clipPadding * 2, params.chartHeight + clipPadding * 2)
+    );
 
     for (final indicator in indicators) {
       if (!indicator.visible) continue;
@@ -530,10 +544,7 @@ class ChartPainter extends CustomPainter {
       final values = indicator.getValues(params.candles);
       
       // Draw the indicator
-      canvas.save();
-      canvas.translate(params.xShift, 0);
       indicator.paint(canvas, params, values);
-      canvas.restore();
     }
 
     canvas.restore();
@@ -548,6 +559,7 @@ class ChartPainter extends CustomPainter {
     return params.shouldRepaint(oldDelegate.params) ||
         draggedOverlay != oldDelegate.draggedOverlay ||
         draggedPrice != oldDelegate.draggedPrice ||
+        draggedInitialPrice != oldDelegate.draggedInitialPrice ||
         draggedPosition != oldDelegate.draggedPosition ||
         isResizingTop != oldDelegate.isResizingTop ||
         isResizingBottom != oldDelegate.isResizingBottom ||

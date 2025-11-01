@@ -19,6 +19,14 @@ class FibonacciRetracement extends ChartOverlay {
   /// Configuration options.
   final FibonacciOptions options;
   
+  /// Optional: Start timestamp (milliseconds since epoch).
+  /// If null, Fibonacci extends from the left edge of the chart.
+  final int? startTime;
+
+  /// Optional: End timestamp (milliseconds since epoch).
+  /// If null, Fibonacci extends to the right edge of the chart.
+  final int? endTime;
+  
   /// Standard Fibonacci retracement levels.
   static const List<double> levels = [
     0.0,    // 0%
@@ -37,6 +45,8 @@ class FibonacciRetracement extends ChartOverlay {
     FibonacciStyle? style,
     FibonacciOptions? options,
     bool visible = true,
+    this.startTime,
+    this.endTime,
   })  : assert(highPrice > lowPrice, 'highPrice must be greater than lowPrice'),
         style = style ?? const FibonacciStyle(),
         options = options ?? const FibonacciOptions(),
@@ -55,6 +65,37 @@ class FibonacciRetracement extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
     
+    // Calculate X coordinates based on timestamps
+    double startX = 0;
+    double endX = params.chartWidth;
+    
+    if (startTime != null || endTime != null) {
+      final visibleStartTime = params.candles.first.timestamp;
+      final visibleEndTime = params.candles.last.timestamp;
+      
+      // Check if Fibonacci is completely outside visible range
+      if (startTime != null && startTime! > visibleEndTime) return;
+      if (endTime != null && endTime! < visibleStartTime) return;
+      
+      if (startTime != null) {
+        final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime!);
+        if (startIndex >= 0) {
+          startX = startIndex * params.candleWidth;
+        }
+      }
+      
+      if (endTime != null) {
+        final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime!);
+        if (endIndex >= 0) {
+          endX = endIndex * params.candleWidth;
+        }
+      }
+      
+      // Clip to visible range
+      startX = startX.clamp(0.0, params.chartWidth);
+      endX = endX.clamp(0.0, params.chartWidth);
+    }
+    
     // Draw background highlight when being dragged
     if (isBeingDragged) {
       final highY = params.fitPrice(highPrice);
@@ -63,7 +104,7 @@ class FibonacciRetracement extends ChartOverlay {
         ..color = const Color(0xFF2196F3).withOpacity(0.1)
         ..style = PaintingStyle.fill;
       canvas.drawRect(
-        Rect.fromLTRB(0, highY, params.chartWidth, lowY),
+        Rect.fromLTRB(startX, highY, endX, lowY),
         bgPaint,
       );
     }
@@ -82,10 +123,10 @@ class FibonacciRetracement extends ChartOverlay {
         ..strokeWidth = isBeingDragged ? style.lineWidth + 1.0 : style.lineWidth
         ..style = PaintingStyle.stroke;
       
-      final endX = options.extendLines ? params.chartWidth : params.chartWidth * 0.7;
+      final lineEndX = options.extendLines ? endX : endX * 0.7;
       canvas.drawLine(
-        Offset(0, y),
-        Offset(endX, y),
+        Offset(startX, y),
+        Offset(lineEndX, y),
         paint,
       );
       
@@ -237,6 +278,8 @@ class FibonacciRetracement extends ChartOverlay {
       style: style,
       options: options,
       visible: visible,
+      startTime: startTime,
+      endTime: endTime,
     );
   }
 
@@ -247,6 +290,8 @@ class FibonacciRetracement extends ChartOverlay {
     FibonacciStyle? style,
     FibonacciOptions? options,
     bool? visible,
+    int? startTime,
+    int? endTime,
   }) {
     return FibonacciRetracement(
       id: id ?? this.id,
@@ -255,6 +300,8 @@ class FibonacciRetracement extends ChartOverlay {
       style: style ?? this.style,
       options: options ?? this.options,
       visible: visible ?? this.visible,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
     );
   }
 }

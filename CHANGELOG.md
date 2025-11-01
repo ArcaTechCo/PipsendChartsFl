@@ -1,3 +1,81 @@
+## 1.0.4
+
+**🎯 Major Overlay Positioning & Rendering Fixes**
+
+### Fixed Overlay Viewport Behavior
+* **All overlays now stay anchored to their chart positions** - Overlays no longer "stick" to the viewport when scrolling
+  * Added optional `startTime` and `endTime` timestamps to `TradingLine`, `PriceZone`, and `FibonacciRetracement`
+  * Overlays now move with their anchored candles and exit the viewport correctly
+  * Backward compatible: overlays without timestamps extend infinitely (legacy behavior)
+* **Fixed TrendLine viewport positioning** - TrendLine now correctly exits viewport when scrolling
+  * Added visibility check to prevent drawing when completely outside visible range
+  * Properly anchored to timestamp positions
+* **Fixed indicator clipping issues** - Indicators (ATR, RSI, etc.) no longer cut off on the left edge
+  * Adjusted `clipRect` offset to compensate for canvas translate
+  * Indicators now render correctly at all zoom levels
+
+**Affected Components:**
+- ✅ TradingLine - Optional timestamps for anchored positioning
+- ✅ PriceZone - Optional timestamps for anchored positioning
+- ✅ Fibonacci Retracement - Optional timestamps for anchored positioning
+- ✅ TrendLine - Improved visibility checks
+- ✅ All Indicators - Fixed clipping issues
+
+**Technical Details:**
+- Modified `ChartPainter` to draw overlays within the translated canvas context
+- Adjusted clipRect calculation: `Offset(-params.xShift, 0)` to compensate for translate
+- Overlays calculate positions using `startIndex * candleWidth` without adding `xShift`
+- Added visibility checks: `if (startTime > visibleEndTime || endTime < visibleStartTime) return;`
+- Updated example to demonstrate anchored overlays
+- Fixed SMA/EMA to use timestamp-based indexing for correct positioning at all zoom levels
+
+**Known Issues:**
+- Some overlay indicators may still have positioning issues at extreme zoom levels (being investigated)
+
+---
+
+## 1.0.3
+
+**🐛 Critical Bug Fixes**
+
+### Fixed Overlay Drag Issues
+
+#### Fibonacci & PriceZone Drag Fix
+* **Fixed Fibonacci becoming gigantic when dragged** - Fibonacci retracements would grow to enormous sizes when attempting to move them
+  * Root cause: `_dragStartPrice` was being overwritten during drag, causing incorrect offset calculations
+  * Solution: Added `_dragInitialPrice` to preserve the initial drag position
+  * Now calculates offset correctly: `offset = currentPrice - initialPrice`
+* **Fixed PriceZone snap-back and delayed updates** - Price zones would snap back or update with delay when dragged
+  * Same root cause as Fibonacci issue
+  * Both overlays now move smoothly and predictably
+* **Fixed TrendLine drag precision** - Improved price offset calculation for trend line movement
+  * Applied same fix to ensure consistent behavior across all draggable overlays
+
+#### Overlay Resize Improvements
+* **Dynamic minimum height based on visible price range** - Overlays now adapt to any price scale
+  * Previous: Fibonacci had 20% minimum, PriceZone had 50% minimum of original size
+  * Now: Both have dynamic minimum of 0.1% of visible price range
+  * Automatically adapts to any instrument (forex, crypto, stocks)
+  * Works perfectly with EUR/USD (0.6), BTC/USD (50,000), or any other price range
+  * Allows overlays to be resized much smaller when zooming in
+  * Prevents overlays from being too restrictive on low-price instruments
+
+**Affected Overlays:**
+- ✅ Fibonacci Retracement - Now drags smoothly without growing + flexible resize
+- ✅ Price Zone - No more snap-back or delayed updates + flexible resize
+- ✅ Trend Line - Improved drag precision
+
+**Technical Details:**
+- Added `_dragInitialPrice` state variable to track initial drag position
+- Modified `_onOverlayDrag()` to update current position without overwriting initial position
+- Updated `_onOverlayDragEnd()` to calculate offset using initial position
+- Passed `draggedInitialPrice` to `ChartPainter` for correct visual feedback during drag
+- Changed minimum height calculation from absolute values to dynamic: `visiblePriceRange * 0.001`
+- Applied dynamic minimum to both `interactive_chart.dart` and `chart_painter.dart`
+- Ensures all draggable overlays maintain correct size and position during drag and visual feedback
+
+---
+
 ## 1.0.2
 
 **🎨 UX Improvements & New Controls**
@@ -46,6 +124,7 @@
 * Fixed watermark being drawn behind volume bars and indicators
 * Fixed overlays being created too large or in unexpected locations
 * Fixed Fibonacci retracements being difficult to select for resizing
+* Fixed TrendLine assertion error when dragging points in reverse order - points now auto-normalize
 
 ### 📚 Documentation
 * **Updated IMPLEMENTATION_GUIDE.md**:

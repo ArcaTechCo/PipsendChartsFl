@@ -169,6 +169,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
   // Drag & drop state for overlays
   ChartOverlay? _draggedOverlay;
   double? _dragStartPrice; // Current price during drag
+  double? _dragInitialPrice; // Initial price when drag started (never updated during drag)
   double? _originalPrice; // Original price when drag started
   Offset? _dragStartPosition; // Current position during drag (for trend lines)
   bool _hasDragged = false; // Track if user actually dragged
@@ -321,6 +322,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   indicators: widget.indicators,
                   draggedOverlay: _draggedOverlay,
                   draggedPrice: _dragStartPrice,
+                  draggedInitialPrice: _dragInitialPrice,
                   draggedPosition: _dragStartPosition,
                   isResizingTop: _isResizingTop,
                   isResizingBottom: _isResizingBottom,
@@ -440,6 +442,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     setState(() {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localPosition.dy);
+                      _dragInitialPrice = params.getPriceFromY(details.localPosition.dy);
                       _hasDragged = false;
                       _isResizingTop = false;
                       _isResizingBottom = false;
@@ -459,6 +462,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     setState(() {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localPosition.dy);
+                      _dragInitialPrice = params.getPriceFromY(details.localPosition.dy);
                       _hasDragged = false;
                       _isResizingTop = false;
                       _isResizingBottom = false;
@@ -469,6 +473,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     setState(() {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localPosition.dy);
+                      _dragInitialPrice = params.getPriceFromY(details.localPosition.dy);
                       _dragStartPosition = details.localPosition;
                       _hasDragged = false;
                       _isResizingTop = false;
@@ -493,6 +498,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 setState(() {
                   _draggedOverlay = null;
                   _dragStartPrice = null;
+                  _dragInitialPrice = null;
                   _originalPrice = null;
                   _hasDragged = false;
                 });
@@ -597,6 +603,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     setState(() {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localFocalPoint.dy);
+                      _dragInitialPrice = params.getPriceFromY(details.localFocalPoint.dy);
                       _hasDragged = false;
                       _isResizingTop = false;
                       _isResizingBottom = false;
@@ -616,6 +623,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     setState(() {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localFocalPoint.dy);
+                      _dragInitialPrice = params.getPriceFromY(details.localFocalPoint.dy);
                       _hasDragged = false;
                       _isResizingTop = false;
                       _isResizingBottom = false;
@@ -626,6 +634,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     setState(() {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localFocalPoint.dy);
+                      _dragInitialPrice = params.getPriceFromY(details.localFocalPoint.dy);
                       _dragStartPosition = details.localFocalPoint;
                       _hasDragged = false;
                       _isResizingTop = false;
@@ -680,6 +689,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
               setState(() {
                 _draggedOverlay = null;
                 _dragStartPrice = null;
+                _dragInitialPrice = null;
                 _dragStartPosition = null;
                 _originalPrice = null;
                 _hasDragged = false;
@@ -908,6 +918,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       tradingLine.options.onPriceChanged?.call(_dragStartPrice!);
     } else if (_draggedOverlay is PriceZone) {
       final priceZone = _draggedOverlay as PriceZone;
+      final params = _prevParams!;
       
       double newMinPrice;
       double newMaxPrice;
@@ -916,9 +927,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
         // Resizing top edge (maxPrice)
         newMinPrice = priceZone.minPrice;
         newMaxPrice = _dragStartPrice!;
-        // Ensure minimum zone height (50% of original or 0.01, whichever is larger)
-        final originalHeight = priceZone.maxPrice - priceZone.minPrice;
-        final minHeight = (originalHeight * 0.5).clamp(0.01, double.infinity);
+        // Ensure minimum zone height (0.1% of visible price range)
+        final visiblePriceRange = params.maxPrice - params.minPrice;
+        final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
         final minAllowedMaxPrice = newMinPrice + minHeight;
         if (newMaxPrice < minAllowedMaxPrice) {
           newMaxPrice = minAllowedMaxPrice;
@@ -927,16 +938,18 @@ class _InteractiveChartState extends State<InteractiveChart> {
         // Resizing bottom edge (minPrice)
         newMinPrice = _dragStartPrice!;
         newMaxPrice = priceZone.maxPrice;
-        // Ensure minimum zone height (50% of original or 0.01, whichever is larger)
-        final originalHeight = priceZone.maxPrice - priceZone.minPrice;
-        final minHeight = (originalHeight * 0.5).clamp(0.01, double.infinity);
+        // Ensure minimum zone height (0.1% of visible price range)
+        final visiblePriceRange = params.maxPrice - params.minPrice;
+        final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
         final maxAllowedMinPrice = newMaxPrice - minHeight;
         if (newMinPrice > maxAllowedMinPrice) {
           newMinPrice = maxAllowedMinPrice;
         }
       } else {
         // Regular drag (move entire zone)
-        final offset = _dragStartPrice! - priceZone.centerPrice;
+        // Use initial price to calculate offset, not current price
+        final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
+        final offset = _dragStartPrice! - initialPrice;
         newMinPrice = priceZone.minPrice + offset;
         newMaxPrice = priceZone.maxPrice + offset;
       }
@@ -945,6 +958,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
       priceZone.options.onRangeChanged?.call(newMinPrice, newMaxPrice);
     } else if (_draggedOverlay is FibonacciRetracement) {
       final fibonacci = _draggedOverlay as FibonacciRetracement;
+      final params = _prevParams!;
       
       double newHighPrice;
       double newLowPrice;
@@ -955,9 +969,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
           // Resizing top edge (highPrice)
           newHighPrice = _dragStartPrice!;
           newLowPrice = fibonacci.lowPrice;
-          // Ensure minimum height (20% of original or 1.0, whichever is larger)
-          final originalHeight = fibonacci.highPrice - fibonacci.lowPrice;
-          final minHeight = (originalHeight * 0.2).clamp(1.0, double.infinity);
+          // Ensure minimum height (0.1% of visible price range)
+          final visiblePriceRange = params.maxPrice - params.minPrice;
+          final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
           final minAllowedHighPrice = newLowPrice + minHeight;
           if (newHighPrice < minAllowedHighPrice) {
             newHighPrice = minAllowedHighPrice;
@@ -966,9 +980,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
           // Resizing bottom edge (lowPrice)
           newHighPrice = fibonacci.highPrice;
           newLowPrice = _dragStartPrice!;
-          // Ensure minimum height (20% of original or 1.0, whichever is larger)
-          final originalHeight = fibonacci.highPrice - fibonacci.lowPrice;
-          final minHeight = (originalHeight * 0.2).clamp(1.0, double.infinity);
+          // Ensure minimum height (0.1% of visible price range)
+          final visiblePriceRange = params.maxPrice - params.minPrice;
+          final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
           final maxAllowedLowPrice = newHighPrice - minHeight;
           if (newLowPrice > maxAllowedLowPrice) {
             newLowPrice = maxAllowedLowPrice;
@@ -976,8 +990,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
         }
       } else {
         // Regular drag (move entire Fibonacci)
-        final centerPrice = (fibonacci.highPrice + fibonacci.lowPrice) / 2;
-        final offset = _dragStartPrice! - centerPrice;
+        // Use initial price to calculate offset, not current price
+        final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
+        final offset = _dragStartPrice! - initialPrice;
         newHighPrice = fibonacci.highPrice + offset;
         newLowPrice = fibonacci.lowPrice + offset;
       }
@@ -1014,7 +1029,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
         }
       } else if (_dragStartPosition != null) {
         // Regular drag (move entire trend line) - calculate offset in both X and Y
-        final priceOffset = _dragStartPrice! - ((trendLine.startPrice + trendLine.endPrice) / 2);
+        // Use initial price to calculate offset, not current price
+        final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
+        final priceOffset = _dragStartPrice! - initialPrice;
         
         // Calculate time offset based on X movement
         final startIndex = params.candles.indexWhere((c) => c.timestamp >= trendLine.startTime);
@@ -1042,6 +1059,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     setState(() {
       _draggedOverlay = null;
       _dragStartPrice = null;
+      _dragInitialPrice = null;
       _dragStartPosition = null;
       _originalPrice = null;
       _hasDragged = false;

@@ -41,6 +41,14 @@ class TradingLine extends chart_overlay.ChartOverlay {
   /// Display and interaction options.
   final TradingLineOptions options;
 
+  /// Optional: Start timestamp (milliseconds since epoch).
+  /// If null, line extends from the left edge of the chart.
+  final int? startTime;
+
+  /// Optional: End timestamp (milliseconds since epoch).
+  /// If null, line extends to the right edge of the chart.
+  final int? endTime;
+
   TradingLine({
     String? id,
     required this.price,
@@ -48,6 +56,8 @@ class TradingLine extends chart_overlay.ChartOverlay {
     TradingLineStyle? style,
     TradingLineOptions? options,
     bool visible = true,
+    this.startTime,
+    this.endTime,
   })  : this.style = style ?? TradingLineStyle.fromType(type),
         this.options = options ?? const TradingLineOptions(),
         super(
@@ -95,6 +105,37 @@ class TradingLine extends chart_overlay.ChartOverlay {
   }
 
   void _drawLine(Canvas canvas, double y, PainterParams params, {bool isBeingDragged = false}) {
+    // Calculate X coordinates based on timestamps (without xShift to keep line fixed)
+    double startX = 0;
+    double endX = params.chartWidth;
+    
+    if (startTime != null) {
+      final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime!);
+      if (startIndex >= 0) {
+        startX = startIndex * params.candleWidth;
+      } else {
+        // Line starts before visible range, start from left edge
+        startX = 0;
+      }
+    }
+    
+    if (endTime != null) {
+      final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime!);
+      if (endIndex >= 0) {
+        endX = endIndex * params.candleWidth;
+      } else {
+        // Line ends after visible range, extend to right edge
+        endX = params.chartWidth;
+      }
+    }
+    
+    // Don't draw if line is completely outside visible range
+    if (endX < 0 || startX > params.chartWidth) return;
+    
+    // Clip to visible range
+    startX = startX.clamp(0, params.chartWidth);
+    endX = endX.clamp(0, params.chartWidth);
+    
     // Clip only the line to the chart area
     canvas.save();
     canvas.clipRect(Offset.zero & Size(params.chartWidth, params.chartHeight));
@@ -105,11 +146,11 @@ class TradingLine extends chart_overlay.ChartOverlay {
       ..style = PaintingStyle.stroke;
 
     if (style.dashPattern != null) {
-      _drawDashedLine(canvas, y, params, paint);
+      _drawDashedLine(canvas, y, params, paint, startX: startX, endX: endX);
     } else {
       canvas.drawLine(
-        Offset(0, y),
-        Offset(params.chartWidth, y),
+        Offset(startX, y),
+        Offset(endX, y),
         paint,
       );
     }
@@ -117,20 +158,21 @@ class TradingLine extends chart_overlay.ChartOverlay {
     canvas.restore();
   }
 
-  void _drawDashedLine(Canvas canvas, double y, PainterParams params, Paint paint) {
+  void _drawDashedLine(Canvas canvas, double y, PainterParams params, Paint paint, {double startX = 0, double? endX}) {
     final dashPattern = style.dashPattern!;
     final dashWidth = dashPattern[0];
     final dashSpace = dashPattern.length > 1 ? dashPattern[1] : dashWidth;
 
-    double startX = 0;
+    final lineEndX = endX ?? params.chartWidth;
+    double currentX = startX;
     final path = Path();
 
-    while (startX < params.chartWidth) {
-      path.moveTo(startX, y);
-      startX += dashWidth;
-      if (startX > params.chartWidth) startX = params.chartWidth;
-      path.lineTo(startX, y);
-      startX += dashSpace;
+    while (currentX < lineEndX) {
+      path.moveTo(currentX, y);
+      currentX += dashWidth;
+      if (currentX > lineEndX) currentX = lineEndX;
+      path.lineTo(currentX, y);
+      currentX += dashSpace;
     }
 
     canvas.drawPath(path, paint);
@@ -231,6 +273,8 @@ class TradingLine extends chart_overlay.ChartOverlay {
       style: style,
       options: options,
       visible: visible,
+      startTime: startTime,
+      endTime: endTime,
     );
   }
 
@@ -242,6 +286,8 @@ class TradingLine extends chart_overlay.ChartOverlay {
     TradingLineStyle? style,
     TradingLineOptions? options,
     bool? visible,
+    int? startTime,
+    int? endTime,
   }) {
     return TradingLine(
       id: id ?? this.id,
@@ -250,6 +296,8 @@ class TradingLine extends chart_overlay.ChartOverlay {
       style: style ?? this.style,
       options: options ?? this.options,
       visible: visible ?? this.visible,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
     );
   }
 
