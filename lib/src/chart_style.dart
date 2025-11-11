@@ -59,6 +59,19 @@ class ChartStyle {
   /// This appears when user clicks on the chart.
   final Color overlayBackgroundColor;
 
+  /// The border radius for rounded candle corners.
+  ///
+  /// Defaults to 0.0 (square corners). Set to a positive value to round
+  /// the corners of the candle bodies. For example:
+  /// - 0.0 = Square corners (default)
+  /// - 2.0 = Slightly rounded
+  /// - 4.0 = Moderately rounded
+  /// - 8.0 = Very rounded
+  ///
+  /// Note: This only affects the thick body of the candle (open-close),
+  /// not the thin wicks (high-low).
+  final double candleBorderRadius;
+
   const ChartStyle({
     this.volumeHeightFactor = 0.2,
     this.priceLabelWidth = 48.0,
@@ -83,5 +96,6 @@ class ChartStyle {
     this.priceGridLineColor = Colors.grey,
     this.selectionHighlightColor = const Color(0x33757575),
     this.overlayBackgroundColor = const Color(0xEE757575),
+    this.candleBorderRadius = 0.0,
   });
 }

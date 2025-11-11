@@ -1,3 +1,84 @@
+## 1.0.5
+
+**🎨 Visual Enhancements & Advanced Chart Controls**
+
+### 🚀 New Features
+
+#### Vertical Zoom & Pan
+* **Vertical Camera Control** - Full control over vertical chart space:
+  * `enableVerticalPan` - Toggle vertical zoom/pan functionality (default: `false`)
+  * `initialVerticalZoom` - Set initial vertical zoom level (1.0 = fit, >1.0 = padding)
+  * **Desktop Controls**:
+    - `Shift + Scroll` - Vertical zoom in/out
+    - `Alt + Scroll` - Vertical pan up/down
+  * **Mobile Controls**:
+    - Vertical drag - Pan chart up/down with natural scrolling
+  * **Programmatic Control**:
+    - `setVerticalZoom(factor)` - Set zoom level (0.5 - 3.0)
+    - `resetVerticalZoom()` - Reset to fit mode
+    - `resetVerticalPan()` - Reset pan offset
+    - `resetVerticalView()` - Reset both zoom and pan
+* **Perfect for Trading** - See TP/SL lines and indicators outside candle range
+* **Backward Compatible** - Disabled by default, maintains legacy auto-fit behavior
+
+#### Rounded Candle Corners
+* **Customizable Candle Style** - Modern, rounded candle appearance:
+  * `candleBorderRadius` in `ChartStyle` - Control corner rounding (0.0 - 8.0)
+  * **Recommended Values**:
+    - `0.0` - Square corners (default, classic)
+    - `2.0` - Slightly rounded
+    - `4.0` - Moderately rounded (recommended)
+    - `8.0` - Very rounded (modern)
+  * **Smart Rendering** - Automatically uses optimal drawing method
+  * **Performance Optimized** - Uses `drawLine` for thin candles, `drawRRect` for thick ones
+  * **Auto-limiting** - Radius capped at half candle width to prevent distortion
+
+### 🎨 UI/UX Improvements
+* **New Vertical Zoom Tab** - Interactive demo in example app:
+  * Toggle `enableVerticalPan` on/off
+  * Slider for fine-tuning zoom (0.5x - 3.0x)
+  * Preset buttons (Fit, Normal, Wide, Max)
+  * Live TP/SL demonstration
+  * Keyboard shortcut hints
+* **Enhanced Settings Tab** - Candle styling controls:
+  * Slider for border radius adjustment
+  * Preset chips (Square, Slight, Medium, Rounded)
+  * Real-time visual preview
+
+### 📚 Documentation
+* **VERTICAL_ZOOM_GUIDE.md** - Complete guide for vertical controls:
+  * Problem explanation and use cases
+  * Desktop and mobile controls
+  * Programmatic control examples
+  * Best practices and troubleshooting
+* **CANDLE_STYLING_GUIDE.md** - Comprehensive styling guide:
+  * Recommended radius values
+  * Multiple code examples
+  * Performance notes
+  * Combination with other styles
+
+### 🔧 Technical Details
+* **Vertical Zoom Implementation**:
+  - Added `_verticalZoomFactor` and `_verticalPanOffset` state variables
+  - Modified price range calculation to apply padding based on zoom factor
+  - Integrated with existing gesture system (no conflicts)
+  - Natural scrolling direction (swipe up = chart moves up)
+* **Rounded Corners Implementation**:
+  - Modified `_drawSingleDay()` in `ChartPainter`
+  - Conditional rendering: `drawRRect` when `borderRadius > 0 && thickWidth > 2`
+  - Falls back to `drawLine` for performance on thin candles
+  - Only affects candle body, not wicks
+
+### 💥 Breaking Changes
+* None - Fully backward compatible with 1.0.4
+* All new features are opt-in with sensible defaults
+
+### 🐛 Bug Fixes
+* Fixed vertical pan direction to match natural scrolling expectations
+* Ensured rounded corners don't distort on very thin candles
+
+---
+
 ## 1.0.4
 
 **🎯 Major Overlay Positioning & Rendering Fixes**

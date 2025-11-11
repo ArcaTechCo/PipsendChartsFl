@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-Dual%20License-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-%E2%89%A5%202.0.0-02569B?logo=flutter)](https://flutter.dev)
-[![Pub Version](https://img.shields.io/badge/pub-v1.0.0-blue)](https://pub.dev)
+[![Pub Version](https://img.shields.io/badge/pub-v1.0.5-blue)](https://pub.dev)
 
 *A powerful, feature-rich charting library for Flutter with 12+ technical indicators, interactive overlays, and professional trading tools.*
 
@@ -55,8 +55,10 @@
 
 ### 📈 Core Charting
 - **Candlestick Charts** - Professional OHLC visualization
-- **Pinch-to-Zoom** - Smooth, responsive zooming
-- **Pan & Scroll** - Intuitive navigation
+- **Pinch-to-Zoom** - Smooth, responsive zooming (horizontal & vertical)
+- **Vertical Zoom & Pan** - Control vertical space for TP/SL lines and indicators
+- **Pan & Scroll** - Intuitive navigation with natural scrolling
+- **Rounded Candles** - Customizable corner radius for modern appearance
 - **Dark/Light Mode** - Built-in theme support
 - **Customizable Styles** - Full control over appearance
 - **Volume Bars** - Integrated volume display
@@ -98,7 +100,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  pipsend_charts: ^1.0.0
+  pipsend_charts: ^1.0.5
 ```
 
 Then run:
@@ -398,31 +400,92 @@ The example includes:
 - **Trading Lines Tab** - Interactive trading lines with FABs
 - **Price Zones Tab** - Draggable price zones
 - **Drawing Tools Tab** - Fibonacci and trend lines
+- **Vertical Zoom Tab** - Interactive vertical zoom/pan demo with TP/SL
+- **Settings Tab** - Chart controls and candle styling options
 
 ---
 
 ## 🎨 Customization
 
+### Vertical Zoom & Pan
+
+Control vertical chart space to see TP/SL lines and indicators outside the candle range.
+
+```dart
+InteractiveChart(
+  candles: candleData,
+  enableVerticalPan: true,        // Enable vertical controls
+  initialVerticalZoom: 1.3,       // 30% padding above/below
+  overlays: [
+    TradingLine(
+      price: 1.2500,
+      type: TradingLineType.takeProfit,
+      options: TradingLineOptions(title: 'TP'),
+    ),
+  ],
+)
+```
+
+**Controls:**
+- **Desktop**: `Shift + Scroll` for zoom, `Alt + Scroll` for pan
+- **Mobile**: Vertical drag to pan
+
+**Programmatic Control:**
+```dart
+final chartKey = GlobalKey<State<StatefulWidget>>();
+
+// Set zoom level
+(chartKey.currentState as _InteractiveChartState?)?.setVerticalZoom(1.5);
+
+// Reset view
+(chartKey.currentState as _InteractiveChartState?)?.resetVerticalView();
+```
+
+See [VERTICAL_ZOOM_GUIDE.md](VERTICAL_ZOOM_GUIDE.md) for complete documentation.
+
+### Rounded Candles
+
+Customize candle appearance with rounded corners for a modern look.
+
+```dart
+InteractiveChart(
+  candles: candleData,
+  style: ChartStyle(
+    candleBorderRadius: 4.0,  // 0.0 = square, 8.0 = very rounded
+    priceGainColor: Colors.green,
+    priceLossColor: Colors.red,
+  ),
+)
+```
+
+**Recommended Values:**
+- `0.0` - Square corners (classic)
+- `2.0` - Slightly rounded
+- `4.0` - Moderately rounded (recommended)
+- `8.0` - Very rounded (modern)
+
+See [CANDLE_STYLING_GUIDE.md](CANDLE_STYLING_GUIDE.md) for complete documentation.
+
 ### Chart Styles
 
 ```dart
 ChartStyle(
-  // Colors
+  // Candle appearance
+  candleBorderRadius: 4.0,
   priceGainColor: Colors.green,
   priceLossColor: Colors.red,
+  
+  // Volume
+  showVolume: true,
   volumeColor: Colors.grey,
+  volumeHeightFactor: 0.2,
   
   // Grid
   priceGridLineColor: Colors.grey.withOpacity(0.2),
-  timeGridLineColor: Colors.grey.withOpacity(0.2),
   
   // Labels
   priceLabelStyle: TextStyle(color: Colors.white, fontSize: 12),
   timeLabelStyle: TextStyle(color: Colors.white, fontSize: 12),
-  
-  // Volume
-  showVolume: true,
-  volumeHeightFactor: 0.2,
   
   // Selection
   selectionHighlightColor: Colors.blue.withOpacity(0.2),

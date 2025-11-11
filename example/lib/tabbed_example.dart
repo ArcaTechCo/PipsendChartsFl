@@ -42,10 +42,17 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   bool _showOBV = false;
   bool _showBB = false;
 
+  // Vertical zoom settings
+  bool _enableVerticalPan = false;
+  double _verticalZoom = 1.3;
+  
+  // Candle style settings
+  double _candleBorderRadius = 0.0;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _setupListeners();
     _setupExampleData();
   }
@@ -186,6 +193,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
               Tab(icon: Icon(Icons.horizontal_rule), text: 'Trading Lines'),
               Tab(icon: Icon(Icons.layers), text: 'Price Zones'),
               Tab(icon: Icon(Icons.trending_up), text: 'Drawing Tools'),
+              Tab(icon: Icon(Icons.zoom_out_map), text: 'Vertical Zoom'),
               Tab(icon: Icon(Icons.settings), text: 'Settings'),
             ],
           ),
@@ -204,6 +212,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
             _buildTradingLinesTab(),
             _buildPriceZonesTab(),
             _buildDrawingToolsTab(),
+            _buildVerticalZoomTab(),
             _buildSettingsTab(),
           ],
         ),
@@ -759,7 +768,174 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   }
 
   // ============================================================================
-  // TAB 5: SETTINGS & CONTROLS
+  // TAB 5: VERTICAL ZOOM
+  // ============================================================================
+  Widget _buildVerticalZoomTab() {
+    // Create some TP/SL lines for demonstration
+    final currentPrice = _data.last.close ?? 150.0;
+    final demoOverlays = [
+      TradingLine(
+        price: currentPrice * 1.08,
+        type: TradingLineType.takeProfit,
+        options: TradingLineOptions(
+          title: 'TP',
+          showPrice: true,
+        ),
+      ),
+      TradingLine(
+        price: currentPrice * 0.92,
+        type: TradingLineType.stopLoss,
+        options: TradingLineOptions(
+          title: 'SL',
+          showPrice: true,
+        ),
+      ),
+    ];
+
+    return Column(
+      children: [
+        // Control Panel
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.blue.shade50,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.zoom_out_map, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Vertical Zoom & Pan',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: _enableVerticalPan,
+                    onChanged: (value) => setState(() => _enableVerticalPan = value),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _enableVerticalPan 
+                    ? 'Enabled - Use Shift+Scroll for zoom, Alt+Scroll for pan'
+                    : 'Disabled - Auto-fit mode (legacy behavior)',
+                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+              if (_enableVerticalPan) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Zoom: ${_verticalZoom.toStringAsFixed(1)}x'),
+                          Slider(
+                            value: _verticalZoom,
+                            min: 0.5,
+                            max: 3.0,
+                            divisions: 25,
+                            label: _verticalZoom.toStringAsFixed(1),
+                            onChanged: (value) => setState(() => _verticalZoom = value),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => setState(() => _verticalZoom = 1.0),
+                      icon: const Icon(Icons.fit_screen, size: 16),
+                      label: const Text('Fit (1.0x)', style: TextStyle(fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => setState(() => _verticalZoom = 1.3),
+                      icon: const Icon(Icons.zoom_out, size: 16),
+                      label: const Text('Normal (1.3x)', style: TextStyle(fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => setState(() => _verticalZoom = 1.5),
+                      icon: const Icon(Icons.zoom_out, size: 16),
+                      label: const Text('Wide (1.5x)', style: TextStyle(fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => setState(() => _verticalZoom = 2.0),
+                      icon: const Icon(Icons.zoom_out, size: 16),
+                      label: const Text('Max (2.0x)', style: TextStyle(fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.amber),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Notice how TP/SL lines are now visible with vertical zoom enabled!',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // Chart
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: InteractiveChart(
+              candles: _data,
+              enableVerticalPan: _enableVerticalPan,
+              initialVerticalZoom: _verticalZoom,
+              overlays: demoOverlays,
+              style: ChartStyle(
+                showVolume: _showVolume,
+                volumeColor: Colors.grey.withOpacity(0.5),
+                priceGridLineColor: Colors.grey.withOpacity(0.1),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================================
+  // TAB 6: SETTINGS & CONTROLS
   // ============================================================================
   Widget _buildSettingsTab() {
     return Stack(
@@ -770,28 +946,90 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
             Container(
               padding: const EdgeInsets.all(16),
               color: Colors.blue.shade50,
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.settings, color: Colors.blue),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Chart Settings & Controls',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                  Row(
+                    children: [
+                      const Icon(Icons.settings, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Chart Settings & Controls',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Watermark: ${_showWatermark ? "ON" : "OFF"} • Interaction: ${_enableInteraction ? "ON" : "OFF"}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Watermark: ${_showWatermark ? "ON" : "OFF"} • Interaction: ${_enableInteraction ? "ON" : "OFF"}',
-                          style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  // Candle Border Radius Control
+                  Row(
+                    children: [
+                      const Icon(Icons.rounded_corner, size: 20, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Candle Corner Radius: ${_candleBorderRadius.toStringAsFixed(1)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Slider(
+                              value: _candleBorderRadius,
+                              min: 0.0,
+                              max: 8.0,
+                              divisions: 16,
+                              label: _candleBorderRadius.toStringAsFixed(1),
+                              onChanged: (value) => setState(() => _candleBorderRadius = value),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Square', style: TextStyle(fontSize: 11)),
+                        selected: _candleBorderRadius == 0.0,
+                        onSelected: (selected) => setState(() => _candleBorderRadius = 0.0),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Slight', style: TextStyle(fontSize: 11)),
+                        selected: _candleBorderRadius == 2.0,
+                        onSelected: (selected) => setState(() => _candleBorderRadius = 2.0),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Medium', style: TextStyle(fontSize: 11)),
+                        selected: _candleBorderRadius == 4.0,
+                        onSelected: (selected) => setState(() => _candleBorderRadius = 4.0),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Rounded', style: TextStyle(fontSize: 11)),
+                        selected: _candleBorderRadius == 8.0,
+                        onSelected: (selected) => setState(() => _candleBorderRadius = 8.0),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -809,6 +1047,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
                   style: ChartStyle(
                     priceGainColor: Colors.green,
                     priceLossColor: Colors.red,
+                    candleBorderRadius: _candleBorderRadius,
                   ),
                 ),
               ),

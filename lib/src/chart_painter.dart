@@ -312,6 +312,8 @@ class ChartPainter extends CustomPainter {
     final x = i * params.candleWidth;
     final thickWidth = max(params.candleWidth * 0.8, 0.8);
     final thinWidth = max(params.candleWidth * 0.2, 0.2);
+    final borderRadius = params.style.candleBorderRadius;
+    
     // Draw price bar
     final open = candle.open;
     final close = candle.close;
@@ -321,13 +323,41 @@ class ChartPainter extends CustomPainter {
       final color = open > close
           ? params.style.priceLossColor
           : params.style.priceGainColor;
-      canvas.drawLine(
-        Offset(x, params.fitPrice(open)),
-        Offset(x, params.fitPrice(close)),
-        Paint()
-          ..strokeWidth = thickWidth
-          ..color = color,
-      );
+      
+      final openY = params.fitPrice(open);
+      final closeY = params.fitPrice(close);
+      
+      // Draw candle body (open-close) with optional rounded corners
+      if (borderRadius > 0 && thickWidth > 2) {
+        // Use rounded rectangle for thicker candles
+        final rect = Rect.fromLTRB(
+          x - thickWidth / 2,
+          min(openY, closeY),
+          x + thickWidth / 2,
+          max(openY, closeY),
+        );
+        final rrect = RRect.fromRectAndRadius(
+          rect,
+          Radius.circular(min(borderRadius, thickWidth / 2)),
+        );
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.fill,
+        );
+      } else {
+        // Use line for thin candles or when borderRadius is 0
+        canvas.drawLine(
+          Offset(x, openY),
+          Offset(x, closeY),
+          Paint()
+            ..strokeWidth = thickWidth
+            ..color = color,
+        );
+      }
+      
+      // Draw wicks (high-low) - always as thin lines
       if (high != null && low != null) {
         canvas.drawLine(
           Offset(x, params.fitPrice(high)),

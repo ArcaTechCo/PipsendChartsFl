@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'candle_data.dart';
@@ -113,6 +114,27 @@ class InteractiveChart extends StatefulWidget {
   /// Use this to control the chart programmatically (e.g., jump to latest).
   final InteractiveChartController? controller;
 
+  /// Initial vertical zoom factor.
+  ///
+  /// - 1.0 = fit candles to screen (no padding) - default
+  /// - >1.0 = zoomed out (adds padding above/below candles)
+  /// - <1.0 = zoomed in (crops view)
+  ///
+  /// This is useful to leave space for indicators, TP/SL lines, etc.
+  /// Users can adjust zoom with Shift+Scroll.
+  final double initialVerticalZoom;
+
+  /// Whether to enable vertical pan and zoom controls.
+  ///
+  /// When false (default), the chart auto-fits candles to fill the height (legacy behavior).
+  /// When true, enables:
+  /// - Vertical zoom with Shift+Scroll (desktop) or pinch (mobile)
+  /// - Vertical pan with Alt+Scroll (desktop) or drag (mobile)
+  /// - Respects initialVerticalZoom value
+  ///
+  /// This is useful when you need space for TP/SL lines or indicators outside the candle range.
+  final bool enableVerticalPan;
+
   const InteractiveChart({
     Key? key,
     required this.candles,
@@ -130,6 +152,8 @@ class InteractiveChart extends StatefulWidget {
     this.enableInteraction = true,
     this.freeCamera = false,
     this.controller,
+    this.initialVerticalZoom = 1.0,
+    this.enableVerticalPan = false,
   })  : this.style = style ?? const ChartStyle(),
         assert(candles.length >= 3,
             "InteractiveChart requires 3 or more CandleData"),
@@ -181,10 +205,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
   bool _isResizingTrendLine = false; // Track if resizing a TrendLine
   bool _isResizingTrendStart = false; // Resizing start point of TrendLine
   bool _isResizingTrendEnd = false; // Resizing end point of TrendLine
+  
+  // Vertical zoom and pan state
+  late double _verticalZoomFactor; // 1.0 = fit to screen, >1.0 = zoomed out (more padding)
+  double _verticalPanOffset = 0.0; // Vertical pan offset in price units
+  double? _prevVerticalPanOffset;
 
   @override
   void initState() {
     super.initState();
+    // Initialize vertical zoom from widget property
+    _verticalZoomFactor = widget.initialVerticalZoom;
     // Attach controller if provided
     widget.controller?.attach(jumpToLatest);
   }
@@ -206,6 +237,38 @@ class _InteractiveChartState extends State<InteractiveChart> {
     
     setState(() {
       _startOffset = newOffset.clamp(0, _getMaxStartOffset(w, _candleWidth));
+    });
+  }
+  
+  /// Reset vertical zoom to fit candles to screen (no padding)
+  void resetVerticalZoom() {
+    setState(() {
+      _verticalZoomFactor = 1.0;
+    });
+  }
+  
+  /// Reset vertical pan to center position
+  void resetVerticalPan() {
+    setState(() {
+      _verticalPanOffset = 0.0;
+    });
+  }
+  
+  /// Reset both vertical zoom and pan
+  void resetVerticalView() {
+    setState(() {
+      _verticalZoomFactor = 1.0;
+      _verticalPanOffset = 0.0;
+    });
+  }
+  
+  /// Set vertical zoom factor programmatically
+  /// - 1.0 = fit to screen (no padding)
+  /// - >1.0 = zoomed out (adds padding)
+  /// - <1.0 = zoomed in (crops view)
+  void setVerticalZoom(double factor) {
+    setState(() {
+      _verticalZoomFactor = factor.clamp(0.5, 3.0);
     });
   }
 
@@ -270,14 +333,25 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
         // Handle case when no candles are visible (free camera beyond data)
         final priceValues = candlesInRange.map(highest).whereType<double>();
-        final maxPrice = priceValues.isNotEmpty 
+        var maxPrice = priceValues.isNotEmpty 
             ? priceValues.reduce(max)
             : 100.0; // Default value when no data visible
         
         final lowValues = candlesInRange.map(lowest).whereType<double>();
-        final minPrice = lowValues.isNotEmpty
+        var minPrice = lowValues.isNotEmpty
             ? lowValues.reduce(min)
             : 0.0; // Default value when no data visible
+        
+        // Apply vertical zoom and pan (only if enabled)
+        if (widget.enableVerticalPan) {
+          // Zoom factor > 1.0 adds padding (zooms out), < 1.0 zooms in
+          final priceRange = maxPrice - minPrice;
+          final paddingFactor = (_verticalZoomFactor - 1.0) / 2.0; // Split padding top/bottom
+          final padding = priceRange * paddingFactor;
+          
+          maxPrice = maxPrice + padding - _verticalPanOffset;
+          minPrice = minPrice - padding - _verticalPanOffset;
+        }
         
         final maxVol = candlesInRange
             .map((c) => c.volume)
@@ -341,6 +415,32 @@ class _InteractiveChartState extends State<InteractiveChart> {
             if (signal is PointerScrollEvent) {
               final dy = signal.scrollDelta.dy;
               if (dy.abs() > 0) {
+                // Check for modifier keys (only if vertical pan is enabled)
+                if (widget.enableVerticalPan) {
+                  final isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+                  final isAltPressed = HardwareKeyboard.instance.isAltPressed;
+                  
+                  if (isShiftPressed) {
+                    // Shift + Scroll = Vertical Zoom
+                    setState(() {
+                      final zoomDelta = dy > 0 ? 0.1 : -0.1;
+                      _verticalZoomFactor = (_verticalZoomFactor + zoomDelta).clamp(0.5, 3.0);
+                    });
+                    return; // Don't process as horizontal zoom
+                  } else if (isAltPressed) {
+                    // Alt + Scroll = Vertical Pan
+                    if (_prevParams != null) {
+                      final priceRange = _prevParams!.maxPrice - _prevParams!.minPrice;
+                      final panDelta = (dy / 100) * priceRange * 0.1;
+                      setState(() {
+                        _verticalPanOffset += panDelta;
+                      });
+                    }
+                    return; // Don't process as horizontal zoom
+                  }
+                }
+                
+                // Normal horizontal zoom
                 _onScaleStart(signal.position);
                 _onScaleUpdate(
                   dy > 0 ? 0.9 : 1.1,
@@ -735,6 +835,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _prevCandleWidth = _candleWidth;
     _prevStartOffset = _startOffset;
     _initialFocalPoint = focalPoint;
+    _prevVerticalPanOffset = _verticalPanOffset;
   }
 
   _onScaleUpdate(double scale, Offset focalPoint, double w) {
@@ -748,7 +849,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
         .clamp(_getMinCandleWidth(w), _getMaxCandleWidth(w));
     final clampedScale = candleWidth / _prevCandleWidth!;
     var startOffset = _prevStartOffset! * clampedScale;
-    // Handle pan
+    // Handle horizontal pan
     final dx = (focalPoint - _initialFocalPoint!).dx * -1;
     startOffset += dx;
     // Adjust pan when zooming
@@ -761,6 +862,19 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (!widget.freeCamera) {
       startOffset = startOffset.clamp(0, _getMaxStartOffset(w, candleWidth));
     }
+    
+    // Handle vertical pan (when dragging vertically) - only if enabled
+    if (widget.enableVerticalPan) {
+      final dy = (focalPoint - _initialFocalPoint!).dy;
+      if (_prevParams != null && dy.abs() > 5) { // Only pan if significant vertical movement
+        final priceRange = _prevParams!.maxPrice - _prevParams!.minPrice;
+        final priceHeight = _prevParams!.priceHeight;
+        // Convert pixel movement to price movement (inverted for natural scrolling)
+        final priceDelta = -(dy / priceHeight) * priceRange;
+        _verticalPanOffset = (_prevVerticalPanOffset ?? 0.0) + priceDelta;
+      }
+    }
+    
     // Fire candle width resize event
     if (candleWidth != _candleWidth) {
       widget.onCandleResize?.call(candleWidth);
