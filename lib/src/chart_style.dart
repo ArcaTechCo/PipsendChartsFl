@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'grid_style.dart';
 
 class ChartStyle {
   /// The percentage height of volume.
@@ -48,8 +49,22 @@ class ChartStyle {
   /// than the number of trend lines, a default blue paint will be applied.
   final List<Paint> trendLineStyles;
 
+  /// Grid configuration for horizontal and vertical lines.
+  /// 
+  /// Use this to configure grid appearance including colors, line styles,
+  /// and visibility for both horizontal (price) and vertical (time) grid lines.
+  /// 
+  /// Example:
+  /// ```dart
+  /// gridStyle: GridStyle.full,  // Show both horizontal and vertical
+  /// ```
+  final GridStyle gridStyle;
+
   /// The color of the price grid line.
-  final Color priceGridLineColor;
+  /// 
+  /// @deprecated Use gridStyle.horizontalGridColor instead.
+  @Deprecated('Use gridStyle.horizontalGridColor instead')
+  final Color? priceGridLineColor;
 
   /// The highlight color. This appears when user clicks on the chart.
   final Color selectionHighlightColor;
@@ -72,6 +87,29 @@ class ChartStyle {
   /// not the thin wicks (high-low).
   final double candleBorderRadius;
 
+  /// Enable adaptive label calculation based on chart size.
+  ///
+  /// When true, the number of price and time labels will automatically
+  /// adjust based on the chart dimensions for optimal readability.
+  ///
+  /// Default: true
+  final bool adaptiveLabels;
+
+  /// Number of price labels to display (vertical axis).
+  ///
+  /// If null and adaptiveLabels is true, calculates automatically based on chart height.
+  /// Range: 3-10
+  /// Default: null (adaptive)
+  final int? priceLabelCount;
+
+  /// Density of time labels (horizontal axis) in pixels.
+  ///
+  /// Controls spacing between time labels. Lower values = more labels.
+  /// If null and adaptiveLabels is true, uses default of 90 pixels.
+  /// Range: 60-120
+  /// Default: null (90 pixels)
+  final int? timeLabelDensity;
+
   const ChartStyle({
     this.volumeHeightFactor = 0.2,
     this.priceLabelWidth = 48.0,
@@ -93,9 +131,18 @@ class ChartStyle {
     this.showVolume = true,
     this.volumeColor = Colors.grey,
     this.trendLineStyles = const [],
-    this.priceGridLineColor = Colors.grey,
+    this.gridStyle = const GridStyle(),
+    @Deprecated('Use gridStyle.horizontalGridColor instead')
+    this.priceGridLineColor,
     this.selectionHighlightColor = const Color(0x33757575),
     this.overlayBackgroundColor = const Color(0xEE757575),
     this.candleBorderRadius = 0.0,
+    this.adaptiveLabels = true,
+    this.priceLabelCount,
+    this.timeLabelDensity,
   });
+
+  /// Get the effective horizontal grid color (for backward compatibility).
+  Color get effectiveHorizontalGridColor =>
+      priceGridLineColor ?? gridStyle.horizontalGridColor;
 }

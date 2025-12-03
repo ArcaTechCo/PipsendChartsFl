@@ -1,3 +1,223 @@
+## 1.0.6
+
+**📊 Grid Configurable, Labels Adaptativos & Infinite History**
+
+### 🚀 New Features
+
+#### Grid Configurable
+* **Full Grid Control** - Complete customization of chart grid lines:
+  * **Horizontal Grid** - Price level grid lines
+  * **Vertical Grid** - Time interval grid lines
+  * Independent control for each type (show/hide, style, color, width)
+* **4 Line Styles** - Visual variety for grid lines:
+  * `solid` - Continuous lines (─────────)
+  * `dashed` - Dashed lines (─ ─ ─ ─ ─)
+  * `dotted` - Dotted lines (· · · · ·)
+  * `longDashed` - Long dashed lines (── ── ──)
+* **Customizable Appearance**:
+  * `horizontalStrokeWidth` / `verticalStrokeWidth` - Line thickness (0.1-3.0)
+  * `horizontalGridColor` / `verticalGridColor` - Independent colors with opacity control
+  * Default: Grey with 30% opacity (visible on light and dark backgrounds)
+* **6 Built-in Presets**:
+  * `GridStyle.none` - No grid lines
+  * `GridStyle.horizontalOnly` - Only horizontal (default)
+  * `GridStyle.full` - Both horizontal and vertical
+  * `GridStyle.subtle` - Low opacity grid (10%)
+  * `GridStyle.dashed` - Dashed style grid
+  * `GridStyle.dotted` - Dotted style grid
+* **Always Aligned** - Grid lines automatically align with price and time labels
+
+#### Adaptive Labels
+* **Smart Label Calculation** - Labels automatically adjust based on chart size:
+  * **Price Labels** - Adapt to chart height (3-10 labels)
+    - Formula: ~80px per label
+    - Small screens (300px) → 4 labels
+    - Large screens (800px) → 10 labels
+  * **Time Labels** - Adapt to chart width
+    - Default: One label every 90 pixels
+    - Configurable density (60-120px)
+* **Manual Override Available**:
+  * `priceLabelCount` - Force specific number of price labels (3-10)
+  * `timeLabelDensity` - Force specific spacing for time labels (60-120px)
+  * `adaptiveLabels` - Toggle adaptive behavior (default: true)
+* **Grid Synchronization** - Grid lines always align with labels
+* **Backward Compatible** - Enabled by default, improves readability automatically
+
+#### Infinite History / Lazy Loading
+* **Dynamic Data Loading** - Load historical data on-demand as users scroll:
+  * Similar to TradingView's Lightweight Charts "Infinite History" feature
+  * Detect when user scrolls near the beginning or end of data
+  * Load more data without losing visual position
+  * Perfect for large datasets and real-time applications
+* **Enhanced XAxisOffsetDetails** - New properties for lazy loading:
+  * `candlesBeforeVisible` - Number of candles before the visible area
+  * `candlesAfterVisible` - Number of candles after the visible area
+  * `isNearStart([threshold])` - Check if near start with configurable threshold (default: 50)
+  * `isNearEnd([threshold])` - Check if near end with configurable threshold (default: 50)
+* **Automatic Position Maintenance** - Chart preserves visual position when prepending data:
+  * Existing logic (lines 284-290 in `interactive_chart.dart`) automatically adjusts offset
+  * Seamless user experience when loading historical data
+  * No jumps or visual artifacts
+* **Bidirectional Loading** - Support for loading both historical and recent data:
+  * Load older data when scrolling left
+  * Load newer data when scrolling right
+  * Configurable thresholds for each direction
+
+### 📚 Documentation
+* **Comprehensive README Section** - Complete guide for Infinite History:
+  * Basic implementation example
+  * XAxisOffsetDetails properties reference
+  * Advanced bidirectional loading pattern
+  * Key features and benefits
+* **Working Example** - New "Infinite History" tab in example app:
+  * Interactive demo with simulated API calls
+  * Loading indicators for visual feedback
+  * Bidirectional data loading demonstration
+  * Debug console output showing offset changes
+  * Info panel with statistics (total candles, batches loaded)
+  * Instructions panel explaining how it works
+
+### 🎨 UI/UX Improvements
+* **Redesigned Settings Tab** - Modern Bottom Sheet interface:
+  * Full-screen chart view (no space wasted)
+  * Draggable Bottom Sheet with settings
+  * Organized sections: Candle Style, Grid, Labels
+  * Real-time preview of changes
+  * Info badges showing current configuration
+* **New Infinite History Tab** - Added to tabbed example:
+  * Real-time statistics display
+  * Loading indicators during data fetch
+  * Visual feedback for scroll position
+  * Helpful instructions and tips
+* **Enhanced Example App** - Updated to 7 tabs (from 6):
+  * Indicators, Trading Lines, Price Zones, Drawing Tools, Vertical Zoom, **Infinite History**, Settings
+* **Interactive Controls**:
+  * Grid: Toggle, style chips, sliders for width/opacity
+  * Labels: Adaptive toggle, manual override sliders
+  * Candles: Border radius slider with presets
+
+### 🔧 Technical Details
+* **GridStyle Class** (new):
+  - `GridLineStyle` enum: solid, dashed, dotted, longDashed
+  - Independent configuration for horizontal and vertical grids
+  - `_drawStyledLine()` method supports all line styles
+  - `_drawDashedLine()` helper for non-solid lines
+  - Grid lines drawn in `_drawHorizontalGrid()` and `_drawVerticalGrid()`
+  - Always rendered before labels (background layer)
+* **Adaptive Labels Implementation**:
+  - `_calculatePriceLabelCount()` - Dynamic calculation based on chart height
+  - `_calculateTimeLabelDensity()` - Configurable spacing for time labels
+  - Formula: `(chartHeight / 80).round().clamp(3, 10)` for price labels
+  - Supports manual override via `priceLabelCount` and `timeLabelDensity`
+  - Grid automatically syncs with calculated label positions
+* **ChartStyle Extensions**:
+  - Added `adaptiveLabels` (bool, default: true)
+  - Added `priceLabelCount` (int?, nullable for adaptive)
+  - Added `timeLabelDensity` (int?, nullable for adaptive)
+  - Added `gridStyle` (GridStyle, replaces deprecated `priceGridLineColor`)
+  - Backward compatible with `@Deprecated` annotation
+* **XAxisOffsetDetails Extensions**:
+  - Added `candlesBeforeVisible` getter (returns `startCandleIndex`)
+  - Added `candlesAfterVisible` getter (returns `totalCandles - endCandleIndex`)
+  - Added `isNearStart([int threshold = 50])` method
+  - Added `isNearEnd([int threshold = 50])` method
+  - All methods include comprehensive documentation and examples
+* **Prepend Support**:
+  - Existing offset adjustment logic handles prepending automatically
+  - When `candles.length` increases, offset is adjusted by `candlesAdded * candleWidth`
+  - Maintains visual position without any additional code needed
+* **Performance**:
+  - Only visible candles are rendered (existing optimization)
+  - Efficient handling of large datasets (10,000+ candles tested)
+  - Minimal overhead for offset calculations
+
+### 💥 Breaking Changes
+* None - Fully backward compatible with 1.0.5
+* All new features are additive and opt-in
+* Existing `onXOffsetChanged` callback behavior unchanged
+
+### 📝 Example Usage
+
+#### Grid Configuration
+```dart
+// Full grid with custom styling
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    gridStyle: GridStyle(
+      showHorizontalGrid: true,
+      showVerticalGrid: true,
+      horizontalLineStyle: GridLineStyle.solid,
+      verticalLineStyle: GridLineStyle.dashed,
+      horizontalStrokeWidth: 1.0,
+      verticalStrokeWidth: 0.5,
+      horizontalGridColor: Colors.grey.withOpacity(0.3),
+      verticalGridColor: Colors.grey.withOpacity(0.1),
+    ),
+  ),
+)
+
+// Using presets
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    gridStyle: GridStyle.full,  // or .none, .subtle, .dashed, .dotted
+  ),
+)
+```
+
+#### Adaptive Labels
+```dart
+// Automatic (default)
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    adaptiveLabels: true,  // Labels adjust to chart size
+  ),
+)
+
+// Manual override
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    adaptiveLabels: false,
+    priceLabelCount: 7,      // Force 7 price labels
+    timeLabelDensity: 100,   // One time label every 100px
+  ),
+)
+```
+
+#### Infinite History
+```dart
+InteractiveChart(
+  candles: _candles,
+  onXOffsetChanged: (details) {
+    // Load more historical data when near start
+    if (details.isNearStart(50) && !_isLoading) {
+      // Use Future.microtask to avoid setState during build
+      Future.microtask(() => _loadMoreHistory());
+    }
+    
+    // Load more recent data when near end
+    if (details.isNearEnd(50) && !_isLoading) {
+      // Use Future.microtask to avoid setState during build
+      Future.microtask(() => _loadMoreRecent());
+    }
+  },
+)
+```
+
+**Important:** Always wrap data loading calls in `Future.microtask()` to avoid calling `setState()` during the build phase.
+
+### 🎯 Use Cases
+* **Real-time Trading Apps** - Load historical data on demand
+* **Large Datasets** - Handle millions of candles efficiently
+* **Mobile Apps** - Reduce initial load time and memory usage
+* **Web Apps** - Progressive data loading for better UX
+* **Historical Analysis** - Load years of data without performance issues
+
+---
+
 ## 1.0.5
 
 **🎨 Visual Enhancements & Advanced Chart Controls**

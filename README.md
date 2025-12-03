@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-Dual%20License-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-%E2%89%A5%202.0.0-02569B?logo=flutter)](https://flutter.dev)
-[![Pub Version](https://img.shields.io/badge/pub-v1.0.5-blue)](https://pub.dev)
+[![Pub Version](https://img.shields.io/badge/pub-v1.0.6-blue)](https://pub.dev)
 
 *A powerful, feature-rich charting library for Flutter with 12+ technical indicators, interactive overlays, and professional trading tools.*
 
@@ -58,6 +58,9 @@
 - **Pinch-to-Zoom** - Smooth, responsive zooming (horizontal & vertical)
 - **Vertical Zoom & Pan** - Control vertical space for TP/SL lines and indicators
 - **Pan & Scroll** - Intuitive navigation with natural scrolling
+- **Configurable Grid** - Horizontal & vertical grid with 4 line styles
+- **Adaptive Labels** - Auto-adjust labels based on chart size
+- **Infinite History** - Lazy loading of historical data (like TradingView)
 - **Rounded Candles** - Customizable corner radius for modern appearance
 - **Dark/Light Mode** - Built-in theme support
 - **Customizable Styles** - Full control over appearance
@@ -100,7 +103,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  pipsend_charts: ^1.0.5
+  pipsend_charts: ^1.0.6
 ```
 
 Then run:
@@ -384,6 +387,232 @@ InteractiveChart(
 )
 ```
 
+### Configurable Grid
+
+Customize chart grid lines for better readability and visual appeal.
+
+#### Basic Usage
+
+```dart
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    gridStyle: GridStyle.full,  // Show both horizontal and vertical
+  ),
+)
+```
+
+#### Custom Grid
+
+```dart
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    gridStyle: GridStyle(
+      // Horizontal (price) grid
+      showHorizontalGrid: true,
+      horizontalLineStyle: GridLineStyle.solid,
+      horizontalStrokeWidth: 1.0,
+      horizontalGridColor: Colors.grey.withOpacity(0.3),
+      
+      // Vertical (time) grid
+      showVerticalGrid: true,
+      verticalLineStyle: GridLineStyle.dashed,
+      verticalStrokeWidth: 0.5,
+      verticalGridColor: Colors.grey.withOpacity(0.1),
+    ),
+  ),
+)
+```
+
+#### Available Presets
+
+```dart
+GridStyle.none          // No grid lines
+GridStyle.horizontalOnly // Only horizontal (default)
+GridStyle.full          // Both horizontal and vertical
+GridStyle.subtle        // Low opacity (10%)
+GridStyle.dashed        // Dashed style
+GridStyle.dotted        // Dotted style
+```
+
+#### Line Styles
+
+- **`GridLineStyle.solid`** - Continuous lines (─────────)
+- **`GridLineStyle.dashed`** - Dashed lines (─ ─ ─ ─ ─)
+- **`GridLineStyle.dotted`** - Dotted lines (· · · · ·)
+- **`GridLineStyle.longDashed`** - Long dashed lines (── ── ──)
+
+---
+
+### Adaptive Labels
+
+Labels automatically adjust to chart size for optimal readability on any device.
+
+#### Automatic (Default)
+
+```dart
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    adaptiveLabels: true,  // Default - auto-adjusts
+  ),
+)
+```
+
+**Behavior:**
+- **Price Labels:** 3-10 labels based on chart height (~80px per label)
+- **Time Labels:** Dynamic spacing based on chart width (default: 90px)
+- **Grid Alignment:** Grid lines always align with labels
+
+#### Manual Override
+
+```dart
+InteractiveChart(
+  candles: data,
+  style: ChartStyle(
+    adaptiveLabels: false,
+    priceLabelCount: 7,      // Force 7 price labels
+    timeLabelDensity: 100,   // One time label every 100px
+  ),
+)
+```
+
+#### Examples by Screen Size
+
+| Device | Height | Price Labels | Width | Time Labels |
+|--------|--------|--------------|-------|-------------|
+| Mobile | 300px | 4 labels | 360px | 4 labels |
+| Tablet | 500px | 6 labels | 768px | 8 labels |
+| Desktop | 800px | 10 labels | 1920px | 21 labels |
+
+---
+
+### Infinite History / Lazy Loading
+
+Load historical data dynamically as the user scrolls, similar to TradingView's Lightweight Charts.
+
+#### Basic Implementation
+
+```dart
+class ChartScreen extends StatefulWidget {
+  @override
+  _ChartScreenState createState() => _ChartScreenState();
+}
+
+class _ChartScreenState extends State<ChartScreen> {
+  List<CandleData> _candles = [];
+  bool _isLoadingHistory = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+  
+  Future<void> _loadInitialData() async {
+    // Load initial 200 candles
+    final data = await api.fetchCandles(limit: 200);
+    setState(() => _candles = data);
+  }
+  
+  Future<void> _loadMoreHistory() async {
+    if (_isLoadingHistory || _candles.isEmpty) return;
+    
+    setState(() => _isLoadingHistory = true);
+    
+    // Get oldest timestamp
+    final oldestTimestamp = _candles.first.timestamp;
+    
+    // Load 100 more historical candles
+    final olderData = await api.fetchCandles(
+      before: oldestTimestamp,
+      limit: 100,
+    );
+    
+    setState(() {
+      // Prepend: Add to the beginning
+      // Chart automatically maintains visual position
+      _candles = [...olderData, ..._candles];
+      _isLoadingHistory = false;
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return InteractiveChart(
+      candles: _candles,
+      
+      // 🔥 Detect when user scrolls near the beginning
+      onXOffsetChanged: (details) {
+        // Load more when less than 50 candles before visible area
+        if (details.isNearStart(50) && !_isLoadingHistory) {
+          print('Loading more historical data...');
+          // Use Future.microtask to avoid setState during build
+          Future.microtask(() => _loadMoreHistory());
+        }
+      },
+    );
+  }
+}
+```
+
+#### XAxisOffsetDetails Properties
+
+The `onXOffsetChanged` callback provides detailed information:
+
+```dart
+onXOffsetChanged: (details) {
+  // Visible range
+  print('Start index: ${details.startCandleIndex}');
+  print('End index: ${details.endCandleIndex}');
+  print('Visible count: ${details.visibleCandleCount}');
+  
+  // Available data
+  print('Candles before visible: ${details.candlesBeforeVisible}');
+  print('Candles after visible: ${details.candlesAfterVisible}');
+  print('Total candles: ${details.totalCandles}');
+  
+  // Boundary checks
+  print('At start: ${details.isAtStart}');
+  print('At end: ${details.isAtEnd}');
+  
+  // Threshold checks (default: 50)
+  print('Near start: ${details.isNearStart()}');
+  print('Near end: ${details.isNearEnd()}');
+  
+  // Custom threshold
+  print('Near start (100): ${details.isNearStart(100)}');
+}
+```
+
+#### Advanced: Bidirectional Loading
+
+Load data in both directions:
+
+```dart
+onXOffsetChanged: (details) {
+  // Load historical data when scrolling left
+  if (details.isNearStart(50) && !_isLoadingHistory) {
+    Future.microtask(() => _loadMoreHistory());
+  }
+  
+  // Load recent data when scrolling right
+  if (details.isNearEnd(50) && !_isLoadingRecent) {
+    Future.microtask(() => _loadMoreRecentData());
+  }
+}
+```
+
+#### Key Features
+
+- **Automatic Position Maintenance** - Chart preserves visual position when prepending data
+- **Configurable Threshold** - Control when to trigger loading (default: 50 candles)
+- **Bidirectional Loading** - Load both historical and recent data
+- **Efficient** - Only renders visible candles, handles large datasets smoothly
+
+See the **Infinite History** tab in the example app for a complete working demo.
+
 ---
 
 ## 💡 Examples
@@ -401,7 +630,8 @@ The example includes:
 - **Price Zones Tab** - Draggable price zones
 - **Drawing Tools Tab** - Fibonacci and trend lines
 - **Vertical Zoom Tab** - Interactive vertical zoom/pan demo with TP/SL
-- **Settings Tab** - Chart controls and candle styling options
+- **Infinite History Tab** - Lazy loading demo with bidirectional data loading
+- **Settings Tab** - Modern Bottom Sheet with Grid, Labels, and Candle controls
 
 ---
 

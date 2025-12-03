@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'candle_data.dart';
 import 'painter_params.dart';
+import 'grid_style.dart';
 import 'overlays/overlay.dart';
 import 'overlays/trading_line.dart';
 import 'overlays/price_zone.dart';
@@ -54,9 +55,13 @@ class ChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Draw grids FIRST (background)
+    _drawHorizontalGrid(canvas, params);
+    _drawVerticalGrid(canvas, params);
+    
     // Draw time labels (dates) & price labels
     _drawTimeLabels(canvas, params);
-    _drawPriceGridAndLabels(canvas, params);
+    _drawPriceLabels(canvas, params);
 
     // Draw prices, volumes & overlays with translate
     canvas.save();
@@ -250,9 +255,44 @@ class ChartPainter extends CustomPainter {
     }
   }
 
+  /// Calculate optimal number of price labels based on chart height
+  int _calculatePriceLabelCount(PainterParams params) {
+    // If manual override, use it
+    if (params.style.priceLabelCount != null) {
+      return params.style.priceLabelCount!.clamp(3, 10);
+    }
+    
+    // If adaptive disabled, use default
+    if (!params.style.adaptiveLabels) {
+      return 5; // Current default
+    }
+    
+    // Adaptive calculation: ~80px per label
+    final height = params.priceHeight;
+    final labelCount = (height / 80).round().clamp(3, 10);
+    return labelCount;
+  }
+
+  /// Calculate optimal time label density
+  int _calculateTimeLabelDensity(PainterParams params) {
+    // If manual override, use it
+    if (params.style.timeLabelDensity != null) {
+      return params.style.timeLabelDensity!.clamp(60, 120);
+    }
+    
+    // If adaptive disabled, use default
+    if (!params.style.adaptiveLabels) {
+      return 90; // Current default
+    }
+    
+    // Adaptive: use default 90px
+    return 90;
+  }
+
   void _drawTimeLabels(canvas, PainterParams params) {
-    // We draw one time label per 90 pixels of screen width
-    final lineCount = params.chartWidth ~/ 90;
+    // Calculate density adaptively
+    final density = _calculateTimeLabelDensity(params);
+    final lineCount = params.chartWidth ~/ density;
     final gap = 1 / (lineCount + 1);
     for (int i = 1; i <= lineCount; i++) {
       double x = i * gap * params.chartWidth;
@@ -279,17 +319,148 @@ class ChartPainter extends CustomPainter {
     }
   }
 
-  void _drawPriceGridAndLabels(canvas, PainterParams params) {
-    [0.0, 0.25, 0.5, 0.75, 1.0]
+  /// Draw horizontal grid lines (aligned with price labels)
+  void _drawHorizontalGrid(Canvas canvas, PainterParams params) {
+    if (!params.style.gridStyle.showHorizontalGrid) return;
+
+    final paint = Paint()
+      ..strokeWidth = params.style.gridStyle.horizontalStrokeWidth
+      ..color = params.style.effectiveHorizontalGridColor
+      ..style = PaintingStyle.stroke;
+
+    // Calculate number of labels adaptively
+    final labelCount = _calculatePriceLabelCount(params);
+    
+    // Generate evenly spaced positions
+    final positions = List.generate(
+      labelCount,
+      (i) => i / (labelCount - 1),
+    );
+
+    // Draw horizontal lines aligned with price labels
+    positions
+        .map((v) => ((params.maxPrice - params.minPrice) * v) + params.minPrice)
+        .forEach((price) {
+      final y = params.fitPrice(price);
+      _drawStyledLine(
+        canvas,
+        Offset(0, y),
+        Offset(params.chartWidth, y),
+        paint,
+        params.style.gridStyle.horizontalLineStyle,
+      );
+    });
+  }
+
+  /// Draw vertical grid lines (aligned with time labels)
+  void _drawVerticalGrid(Canvas canvas, PainterParams params) {
+    if (!params.style.gridStyle.showVerticalGrid) return;
+
+    final paint = Paint()
+      ..strokeWidth = params.style.gridStyle.verticalStrokeWidth
+      ..color = params.style.gridStyle.verticalGridColor
+      ..style = PaintingStyle.stroke;
+
+    // Draw vertical lines aligned with time labels
+    final density = _calculateTimeLabelDensity(params);
+    final lineCount = params.chartWidth ~/ density;
+    final gap = 1 / (lineCount + 1);
+
+    for (int i = 1; i <= lineCount; i++) {
+      double x = i * gap * params.chartWidth;
+      final index = params.getCandleIndexFromOffset(x);
+
+      if (index < params.candles.length) {
+        _drawStyledLine(
+          canvas,
+          Offset(x, 0),
+          Offset(x, params.chartHeight),
+          paint,
+          params.style.gridStyle.verticalLineStyle,
+        );
+      }
+    }
+  }
+
+  /// Draw a line with the specified style (solid, dashed, dotted)
+  void _drawStyledLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint,
+    GridLineStyle lineStyle,
+  ) {
+    switch (lineStyle) {
+      case GridLineStyle.solid:
+        canvas.drawLine(start, end, paint);
+        break;
+
+      case GridLineStyle.dashed:
+        _drawDashedLine(canvas, start, end, paint, dashLength: 5, gapLength: 3);
+        break;
+
+      case GridLineStyle.dotted:
+        _drawDashedLine(canvas, start, end, paint, dashLength: 1, gapLength: 3);
+        break;
+
+      case GridLineStyle.longDashed:
+        _drawDashedLine(canvas, start, end, paint, dashLength: 10, gapLength: 5);
+        break;
+    }
+  }
+
+  /// Helper to draw dashed/dotted lines
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint, {
+    required double dashLength,
+    required double gapLength,
+  }) {
+    final path = Path();
+    final totalLength = (end - start).distance;
+    final dashCount = (totalLength / (dashLength + gapLength)).floor();
+
+    if (totalLength == 0) return;
+
+    final dx = (end.dx - start.dx) / totalLength;
+    final dy = (end.dy - start.dy) / totalLength;
+
+    for (int i = 0; i < dashCount; i++) {
+      final startOffset = i * (dashLength + gapLength);
+      final endOffset = startOffset + dashLength;
+
+      final dashStart = Offset(
+        start.dx + dx * startOffset,
+        start.dy + dy * startOffset,
+      );
+      final dashEnd = Offset(
+        start.dx + dx * endOffset,
+        start.dy + dy * endOffset,
+      );
+
+      path.moveTo(dashStart.dx, dashStart.dy);
+      path.lineTo(dashEnd.dx, dashEnd.dy);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  /// Draw price labels (without grid lines)
+  void _drawPriceLabels(Canvas canvas, PainterParams params) {
+    // Calculate number of labels adaptively
+    final labelCount = _calculatePriceLabelCount(params);
+    
+    // Generate evenly spaced positions
+    final positions = List.generate(
+      labelCount,
+      (i) => i / (labelCount - 1),
+    );
+    
+    positions
         .map((v) => ((params.maxPrice - params.minPrice) * v) + params.minPrice)
         .forEach((y) {
-      canvas.drawLine(
-        Offset(0, params.fitPrice(y)),
-        Offset(params.chartWidth, params.fitPrice(y)),
-        Paint()
-          ..strokeWidth = 0.5
-          ..color = params.style.priceGridLineColor,
-      );
       final priceTp = TextPainter(
         text: TextSpan(
           text: getPriceLabel(y),

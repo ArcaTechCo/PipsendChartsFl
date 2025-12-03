@@ -2,6 +2,7 @@ export 'src/candle_data.dart';
 export 'src/interactive_chart.dart';
 export 'src/interactive_chart_controller.dart';
 export 'src/chart_style.dart';
+export 'src/grid_style.dart';
 export 'src/x_axis_offset_details.dart';
 export 'src/tap_details.dart';
 

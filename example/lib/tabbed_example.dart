@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pipsend_charts/pipsend_charts.dart';
 import 'mock_data.dart';
+import 'infinite_history_example.dart';
 
 /// Tabbed example with different chart features organized by category
 class TabbedChartExample extends StatefulWidget {
@@ -48,11 +49,26 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   
   // Candle style settings
   double _candleBorderRadius = 0.0;
+  
+  // Grid settings
+  bool _showHorizontalGrid = true;
+  bool _showVerticalGrid = false;
+  GridLineStyle _horizontalLineStyle = GridLineStyle.solid;
+  GridLineStyle _verticalLineStyle = GridLineStyle.solid;
+  double _horizontalStrokeWidth = 0.5;
+  double _verticalStrokeWidth = 0.5;
+  Color _horizontalGridColor = Colors.grey.withOpacity(0.3);
+  Color _verticalGridColor = Colors.grey.withOpacity(0.3);
+  
+  // Label settings
+  bool _adaptiveLabels = true;
+  int? _priceLabelCount;  // null = adaptive
+  int? _timeLabelDensity; // null = adaptive (90px)
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _setupListeners();
     _setupExampleData();
   }
@@ -194,6 +210,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
               Tab(icon: Icon(Icons.layers), text: 'Price Zones'),
               Tab(icon: Icon(Icons.trending_up), text: 'Drawing Tools'),
               Tab(icon: Icon(Icons.zoom_out_map), text: 'Vertical Zoom'),
+              Tab(icon: Icon(Icons.history), text: 'Infinite History'),
               Tab(icon: Icon(Icons.settings), text: 'Settings'),
             ],
           ),
@@ -213,6 +230,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
             _buildPriceZonesTab(),
             _buildDrawingToolsTab(),
             _buildVerticalZoomTab(),
+            const InfiniteHistoryExample(),
             _buildSettingsTab(),
           ],
         ),
@@ -940,119 +958,58 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   Widget _buildSettingsTab() {
     return Stack(
       children: [
-        Column(
-          children: [
-            // Info Panel
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.blue.shade50,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.settings, color: Colors.blue),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Chart Settings & Controls',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Watermark: ${_showWatermark ? "ON" : "OFF"} • Interaction: ${_enableInteraction ? "ON" : "OFF"}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  // Candle Border Radius Control
-                  Row(
-                    children: [
-                      const Icon(Icons.rounded_corner, size: 20, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Candle Corner Radius: ${_candleBorderRadius.toStringAsFixed(1)}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Slider(
-                              value: _candleBorderRadius,
-                              min: 0.0,
-                              max: 8.0,
-                              divisions: 16,
-                              label: _candleBorderRadius.toStringAsFixed(1),
-                              onChanged: (value) => setState(() => _candleBorderRadius = value),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Square', style: TextStyle(fontSize: 11)),
-                        selected: _candleBorderRadius == 0.0,
-                        onSelected: (selected) => setState(() => _candleBorderRadius = 0.0),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Slight', style: TextStyle(fontSize: 11)),
-                        selected: _candleBorderRadius == 2.0,
-                        onSelected: (selected) => setState(() => _candleBorderRadius = 2.0),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Medium', style: TextStyle(fontSize: 11)),
-                        selected: _candleBorderRadius == 4.0,
-                        onSelected: (selected) => setState(() => _candleBorderRadius = 4.0),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Rounded', style: TextStyle(fontSize: 11)),
-                        selected: _candleBorderRadius == 8.0,
-                        onSelected: (selected) => setState(() => _candleBorderRadius = 8.0),
-                      ),
-                    ],
-                  ),
-                ],
+        // Chart (Full Screen)
+        Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: InteractiveChart(
+            candles: _data,
+            controller: _chartController,
+            showWatermark: _showWatermark,
+            enableInteraction: _enableInteraction,
+            style: ChartStyle(
+              priceGainColor: Colors.green,
+              priceLossColor: Colors.red,
+              candleBorderRadius: _candleBorderRadius,
+              adaptiveLabels: _adaptiveLabels,
+              priceLabelCount: _priceLabelCount,
+              timeLabelDensity: _timeLabelDensity,
+              gridStyle: GridStyle(
+                showHorizontalGrid: _showHorizontalGrid,
+                showVerticalGrid: _showVerticalGrid,
+                horizontalLineStyle: _horizontalLineStyle,
+                verticalLineStyle: _verticalLineStyle,
+                horizontalStrokeWidth: _horizontalStrokeWidth,
+                verticalStrokeWidth: _verticalStrokeWidth,
+                horizontalGridColor: _horizontalGridColor,
+                verticalGridColor: _verticalGridColor,
               ),
             ),
-            
-            // Chart
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: InteractiveChart(
-                  candles: _data,
-                  controller: _chartController,
-                  showWatermark: _showWatermark,
-                  enableInteraction: _enableInteraction,
-                  style: ChartStyle(
-                    priceGainColor: Colors.green,
-                    priceLossColor: Colors.red,
-                    candleBorderRadius: _candleBorderRadius,
-                  ),
+          ),
+        ),
+        
+        // Info Badge (Top)
+        Positioned(
+          top: 16,
+          left: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.settings, size: 16, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  'Grid: ${_showHorizontalGrid && _showVerticalGrid ? "Full" : _showHorizontalGrid ? "H" : _showVerticalGrid ? "V" : "Off"} • '
+                  'Radius: ${_candleBorderRadius.toStringAsFixed(1)}',
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
         
         // Floating Action Buttons
@@ -1062,33 +1019,45 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Open Settings Bottom Sheet
+              Builder(
+                builder: (context) => FloatingActionButton(
+                  heroTag: 'open_settings',
+                  onPressed: () => _showSettingsBottomSheet(context),
+                  tooltip: 'Chart Settings',
+                  backgroundColor: Colors.blue,
+                  child: const Icon(Icons.tune),
+                ),
+              ),
+              const SizedBox(height: 12),
+              
               // Toggle Watermark
-              FloatingActionButton(
+              FloatingActionButton.small(
                 heroTag: 'toggle_watermark',
                 onPressed: () => setState(() => _showWatermark = !_showWatermark),
                 tooltip: _showWatermark ? 'Hide Watermark' : 'Show Watermark',
                 backgroundColor: _showWatermark ? Colors.blue : Colors.grey,
-                child: Icon(_showWatermark ? Icons.branding_watermark : Icons.branding_watermark_outlined),
+                child: Icon(_showWatermark ? Icons.branding_watermark : Icons.branding_watermark_outlined, size: 20),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               
               // Toggle Interaction
-              FloatingActionButton(
+              FloatingActionButton.small(
                 heroTag: 'toggle_interaction',
                 onPressed: () => setState(() => _enableInteraction = !_enableInteraction),
                 tooltip: _enableInteraction ? 'Disable Interaction' : 'Enable Interaction',
                 backgroundColor: _enableInteraction ? Colors.green : Colors.grey,
-                child: Icon(_enableInteraction ? Icons.touch_app : Icons.touch_app_outlined),
+                child: Icon(_enableInteraction ? Icons.touch_app : Icons.touch_app_outlined, size: 20),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               
               // Jump to Latest
-              FloatingActionButton(
-                heroTag: 'jump_latest',
+              FloatingActionButton.small(
+                heroTag: 'jump_to_latest',
                 onPressed: () => _chartController.jumpToLatest(),
                 tooltip: 'Jump to Latest',
                 backgroundColor: Colors.orange,
-                child: const Icon(Icons.skip_next),
+                child: const Icon(Icons.skip_next, size: 20),
               ),
             ],
           ),
@@ -1096,8 +1065,417 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
       ],
     );
   }
-
-  // ============================================================================
+  
+  // Show Settings Bottom Sheet
+  void _showSettingsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Title
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Icon(Icons.settings, color: Colors.blue),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Chart Settings',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // Content
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _buildCandleStyleSection(),
+                    const SizedBox(height: 24),
+                    _buildGridSection(),
+                    const SizedBox(height: 24),
+                    _buildLabelsSection(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Candle Style Section
+  Widget _buildCandleStyleSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.rounded_corner, size: 20, color: Colors.blue),
+            const SizedBox(width: 8),
+            const Text(
+              'Candle Style',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Corner Radius: ${_candleBorderRadius.toStringAsFixed(1)}',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        Slider(
+          value: _candleBorderRadius,
+          min: 0.0,
+          max: 8.0,
+          divisions: 16,
+          label: _candleBorderRadius.toStringAsFixed(1),
+          onChanged: (value) => setState(() => _candleBorderRadius = value),
+        ),
+        Wrap(
+          spacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('Square'),
+              selected: _candleBorderRadius == 0.0,
+              onSelected: (_) => setState(() => _candleBorderRadius = 0.0),
+            ),
+            ChoiceChip(
+              label: const Text('Slight'),
+              selected: _candleBorderRadius == 2.0,
+              onSelected: (_) => setState(() => _candleBorderRadius = 2.0),
+            ),
+            ChoiceChip(
+              label: const Text('Medium'),
+              selected: _candleBorderRadius == 4.0,
+              onSelected: (_) => setState(() => _candleBorderRadius = 4.0),
+            ),
+            ChoiceChip(
+              label: const Text('Rounded'),
+              selected: _candleBorderRadius == 8.0,
+              onSelected: (_) => setState(() => _candleBorderRadius = 8.0),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
+  // Grid Section
+  Widget _buildGridSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.grid_on, size: 20, color: Colors.blue),
+            const SizedBox(width: 8),
+            const Text(
+              'Grid Configuration',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Horizontal Grid
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Horizontal Grid'),
+          value: _showHorizontalGrid,
+          onChanged: (val) => setState(() => _showHorizontalGrid = val),
+        ),
+        if (_showHorizontalGrid) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Style:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Solid'),
+                      selected: _horizontalLineStyle == GridLineStyle.solid,
+                      onSelected: (_) => setState(() => _horizontalLineStyle = GridLineStyle.solid),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Dashed'),
+                      selected: _horizontalLineStyle == GridLineStyle.dashed,
+                      onSelected: (_) => setState(() => _horizontalLineStyle = GridLineStyle.dashed),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Dotted'),
+                      selected: _horizontalLineStyle == GridLineStyle.dotted,
+                      onSelected: (_) => setState(() => _horizontalLineStyle = GridLineStyle.dotted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text('Stroke Width: ${_horizontalStrokeWidth.toStringAsFixed(1)}', 
+                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                Slider(
+                  value: _horizontalStrokeWidth,
+                  min: 0.1,
+                  max: 3.0,
+                  divisions: 29,
+                  label: _horizontalStrokeWidth.toStringAsFixed(1),
+                  onChanged: (val) => setState(() => _horizontalStrokeWidth = val),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Text('Opacity: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    Expanded(
+                      child: Slider(
+                        value: _horizontalGridColor.opacity,
+                        min: 0.0,
+                        max: 1.0,
+                        divisions: 20,
+                        label: (_horizontalGridColor.opacity * 100).toStringAsFixed(0) + '%',
+                        onChanged: (val) => setState(() => 
+                          _horizontalGridColor = _horizontalGridColor.withOpacity(val)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        // Vertical Grid
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Vertical Grid'),
+          value: _showVerticalGrid,
+          onChanged: (val) => setState(() => _showVerticalGrid = val),
+        ),
+        if (_showVerticalGrid) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Style:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Solid'),
+                      selected: _verticalLineStyle == GridLineStyle.solid,
+                      onSelected: (_) => setState(() => _verticalLineStyle = GridLineStyle.solid),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Dashed'),
+                      selected: _verticalLineStyle == GridLineStyle.dashed,
+                      onSelected: (_) => setState(() => _verticalLineStyle = GridLineStyle.dashed),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Dotted'),
+                      selected: _verticalLineStyle == GridLineStyle.dotted,
+                      onSelected: (_) => setState(() => _verticalLineStyle = GridLineStyle.dotted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text('Stroke Width: ${_verticalStrokeWidth.toStringAsFixed(1)}', 
+                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                Slider(
+                  value: _verticalStrokeWidth,
+                  min: 0.1,
+                  max: 3.0,
+                  divisions: 29,
+                  label: _verticalStrokeWidth.toStringAsFixed(1),
+                  onChanged: (val) => setState(() => _verticalStrokeWidth = val),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Text('Opacity: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    Expanded(
+                      child: Slider(
+                        value: _verticalGridColor.opacity,
+                        min: 0.0,
+                        max: 1.0,
+                        divisions: 20,
+                        label: (_verticalGridColor.opacity * 100).toStringAsFixed(0) + '%',
+                        onChanged: (val) => setState(() => 
+                          _verticalGridColor = _verticalGridColor.withOpacity(val)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        // Grid Presets
+        const SizedBox(height: 8),
+        const Text(
+          'Presets:',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('No Grid'),
+              selected: !_showHorizontalGrid && !_showVerticalGrid,
+              onSelected: (_) => setState(() {
+                _showHorizontalGrid = false;
+                _showVerticalGrid = false;
+              }),
+            ),
+            ChoiceChip(
+              label: const Text('Horizontal'),
+              selected: _showHorizontalGrid && !_showVerticalGrid,
+              onSelected: (_) => setState(() {
+                _showHorizontalGrid = true;
+                _showVerticalGrid = false;
+              }),
+            ),
+            ChoiceChip(
+              label: const Text('Full Grid'),
+              selected: _showHorizontalGrid && _showVerticalGrid,
+              onSelected: (_) => setState(() {
+                _showHorizontalGrid = true;
+                _showVerticalGrid = true;
+              }),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
+  // Labels Section
+  Widget _buildLabelsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.label, size: 20, color: Colors.blue),
+            const SizedBox(width: 8),
+            const Text(
+              'Label Configuration',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Adaptive Labels Toggle
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Adaptive Labels'),
+          subtitle: const Text('Auto-adjust based on chart size', style: TextStyle(fontSize: 12)),
+          value: _adaptiveLabels,
+          onChanged: (val) => setState(() {
+            _adaptiveLabels = val;
+            if (val) {
+              _priceLabelCount = null;
+              _timeLabelDensity = null;
+            }
+          }),
+        ),
+        const SizedBox(height: 12),
+        // Manual Controls (when adaptive is off)
+        if (!_adaptiveLabels) ...[
+          Text(
+            'Price Labels: ${_priceLabelCount ?? 5}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          Slider(
+            value: (_priceLabelCount ?? 5).toDouble(),
+            min: 3,
+            max: 10,
+            divisions: 7,
+            label: (_priceLabelCount ?? 5).toString(),
+            onChanged: (val) => setState(() => _priceLabelCount = val.toInt()),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Time Label Density: ${_timeLabelDensity ?? 90}px',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          Slider(
+            value: (_timeLabelDensity ?? 90).toDouble(),
+            min: 60,
+            max: 120,
+            divisions: 12,
+            label: '${_timeLabelDensity ?? 90}px',
+            onChanged: (val) => setState(() => _timeLabelDensity = val.toInt()),
+          ),
+        ] else ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Labels automatically adjust based on chart dimensions',
+                    style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+  
   // HELPER WIDGETS
   // ============================================================================
   Widget _buildToggleChip(String label, bool value, ValueChanged<bool> onChanged) {
