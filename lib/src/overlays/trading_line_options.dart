@@ -60,6 +60,9 @@ class TradingLineOptions {
   /// Callback when the price changes (via drag).
   final ValueChanged<double>? onPriceChanged;
 
+  /// Callback when the line is being dragged (real-time updates).
+  final ValueChanged<double>? onPriceDragging;
+
   /// Callback when the line is deleted.
   final VoidCallback? onDelete;
 
@@ -78,6 +81,7 @@ class TradingLineOptions {
     this.deletable = true,
     this.onTap,
     this.onPriceChanged,
+    this.onPriceDragging,
     this.onDelete,
   });
 
@@ -97,6 +101,7 @@ class TradingLineOptions {
     bool? deletable,
     VoidCallback? onTap,
     ValueChanged<double>? onPriceChanged,
+    ValueChanged<double>? onPriceDragging,
     VoidCallback? onDelete,
   }) {
     return TradingLineOptions(
@@ -114,6 +119,7 @@ class TradingLineOptions {
       deletable: deletable ?? this.deletable,
       onTap: onTap ?? this.onTap,
       onPriceChanged: onPriceChanged ?? this.onPriceChanged,
+      onPriceDragging: onPriceDragging ?? this.onPriceDragging,
       onDelete: onDelete ?? this.onDelete,
     );
   }

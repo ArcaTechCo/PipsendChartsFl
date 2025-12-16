@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-Dual%20License-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-%E2%89%A5%202.0.0-02569B?logo=flutter)](https://flutter.dev)
-[![Pub Version](https://img.shields.io/badge/pub-v1.0.6-blue)](https://pub.dev)
+[![Pub Version](https://img.shields.io/badge/pub-v1.0.7-blue)](https://pub.dev)
 
 *A powerful, feature-rich charting library for Flutter with 12+ technical indicators, interactive overlays, and professional trading tools.*
 
@@ -103,7 +103,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  pipsend_charts: ^1.0.6
+  pipsend_charts: ^1.0.7
 ```
 
 Then run:

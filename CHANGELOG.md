@@ -1,3 +1,54 @@
+## 1.0.7
+
+**🎯 Real-time Drag Events for Trading Lines**
+
+### 🚀 New Features
+
+#### Trading Line Drag Events
+* **Real-time Drag Callback** - New `onPriceDragging` callback for TradingLine:
+  * Fires continuously while dragging a trading line
+  * Provides real-time price updates during drag operation
+  * Perfect for live price validation, UI updates, or calculations
+  * Complements existing `onPriceChanged` callback (fires once on drag end)
+* **Enhanced User Experience** - Enables responsive feedback:
+  * Update UI elements in real-time as user drags
+  * Show live calculations (P&L, risk/reward, etc.)
+  * Validate price levels during drag
+  * Display dynamic tooltips or overlays
+
+### 📝 Example Usage
+
+```dart
+TradingLine(
+  price: 150.0,
+  type: TradingLineType.takeProfit,
+  options: TradingLineOptions(
+    draggable: true,
+    // Called continuously while dragging
+    onPriceDragging: (newPrice) {
+      print('Dragging to: $newPrice');
+      // Update UI, show calculations, etc.
+    },
+    // Called once when drag ends
+    onPriceChanged: (finalPrice) {
+      print('Final price: $finalPrice');
+      // Save to database, update state, etc.
+    },
+  ),
+)
+```
+
+### 🔧 Technical Details
+* Added `onPriceDragging` callback to `TradingLineOptions`
+* Updated `_onOverlayDrag()` in `InteractiveChart` to call callback during drag
+* Maintains backward compatibility - callback is optional
+* No performance impact - callback only fires when line is being dragged
+
+### 💥 Breaking Changes
+* None - Fully backward compatible with 1.0.6
+
+---
+
 ## 1.0.6
 
 **📊 Grid Configurable, Labels Adaptativos & Infinite History**

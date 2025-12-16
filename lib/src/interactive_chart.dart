@@ -1014,6 +1014,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final params = _prevParams!;
     final newPrice = params.getPriceFromY(position.dy);
     
+    // Call onPriceDragging callback for TradingLine (real-time updates)
+    if (_draggedOverlay is TradingLine) {
+      final tradingLine = _draggedOverlay as TradingLine;
+      tradingLine.options.onPriceDragging?.call(newPrice);
+    }
     
     // Store the current price and position for the drag
     _dragStartPrice = newPrice;
