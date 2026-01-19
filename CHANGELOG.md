@@ -1,3 +1,176 @@
+## 1.1.7
+
+**🎨 Complete Drawing Tools Suite - 26 Professional Tools**
+
+### 🚀 Major Features
+
+#### 14 Advanced Drawing Tools
+* **Complete Tool Suite** - Added 11 new professional drawing tools:
+  * **WMA Indicator** - Weighted Moving Average with linear weights
+  * **Volume Profile** - Distribution of volume by price level with POC
+  * **Trading Sessions** - Highlight Asian, European, and American sessions
+  * **Fibonacci Extension** - 3-point projection with independent drag (A, B, C points)
+  * **Fibonacci Fan** - Radial Fibonacci lines from pivot point
+  * **Position Tool** - Visualize trades with Entry, SL, and TP lines (independent drag)
+  * **Ruler Tool** - Measure price/time distance with statistics display
+  * **Vertical Line** - Mark temporal events on the chart
+  * **Arrow Tool** - Directional arrows for annotations with customizable arrowheads
+  * **Circle Tool** - Highlight areas with resizable circles/ellipses
+  * **Text Tool** - Add text annotations with double-tap editing
+  * **Brush Tool** - Freehand drawing visualization with smooth curves
+  * **Gantt Tool** - Time period bars with labels and resize handles
+
+#### Full Drag & Drop Support
+* **Interactive Overlays** - All 14 drawing tools support drag & drop:
+  * Real-time preview during drag operation
+  * Visual feedback with enhanced appearance
+  * Callbacks for position updates (`onMoved`)
+  * Handle-based resize for multi-point tools
+  * Independent handle drag for complex tools
+* **Smart Handle Detection** - Precise hit testing:
+  * Separate detection for start/end handles
+  * Center and radius handles for circles
+  * Multi-point handles for Fibonacci tools
+  * Entry, SL, TP handles for Position Tool
+* **Preview System** - Live visual feedback:
+  * ChartPainter renders preview during drag
+  * Updated positions calculated in real-time
+  * Smooth transitions and visual indicators
+
+#### Text Tool with Inline Editing
+* **Double-Tap Editing** - Interactive text editing:
+  * Double-tap detection (< 300ms, < 20px distance)
+  * Dialog-based text editor with TextField
+  * Auto-focus and Enter key support
+  * Cancel and Save buttons
+  * Real-time text updates
+* **Rich Styling** - Comprehensive text customization:
+  * Font size, color, weight, and style
+  * Background with padding and border radius
+  * Border with customizable color and width
+  * Horizontal and vertical alignment (3x3 grid)
+  * Optional background and border display
+
+#### Advanced Fibonacci Tools
+* **Fibonacci Extension** - 3-point projection tool:
+  * Points A, B, C with independent drag
+  * Extension levels: 0%, 38.2%, 61.8%, 100%, 127.2%, 161.8%, 200%, 261.8%
+  * Customizable colors and labels
+  * Hit testing for all three points
+* **Fibonacci Fan** - Radial trend lines:
+  * Start and end points with drag support
+  * Fan levels: 38.2%, 50%, 61.8%
+  * Extends to chart boundaries
+  * Customizable line styles
+
+#### Position & Ruler Tools
+* **Position Tool** - Complete trade visualization:
+  * Entry, Stop Loss, and Take Profit lines
+  * Long and Short position types
+  * Independent drag for each line
+  * Color-coded by position type
+  * Labels with prices
+* **Ruler Tool** - Measurement tool:
+  * Measures price difference and percentage
+  * Shows number of candles and time elapsed
+  * Draggable start and end handles
+  * Statistics display with formatting
+
+#### Shape Tools
+* **Arrow Tool** - Directional annotations:
+  * Start and end points with drag
+  * Customizable arrowhead size
+  * Filled or outline style
+  * Color and stroke width options
+* **Circle Tool** - Area highlighting:
+  * Center point and radius drag
+  * Separate resize handle for radius
+  * Filled or outline style
+  * Ellipse support (different X/Y radius)
+
+#### Gantt & Brush Tools
+* **Gantt Tool** - Time period visualization:
+  * Start and end time with resize handles
+  * Price level positioning
+  * Customizable height
+  * Labels with background
+  * Fill color and opacity
+* **Brush Tool** - Freehand annotations:
+  * Multiple points with smooth curves
+  * Bezier curve rendering
+  * Customizable stroke width and color
+  * Hit testing on line segments
+  * Visualization of predefined strokes
+
+### 📚 Documentation
+* **INTEGRATION_GUIDE.md** - Complete integration guide:
+  * All 26 tools documented with examples
+  * Installation and setup instructions
+  * Code examples for each tool
+  * Customization options
+  * Best practices and troubleshooting
+  * Gesture support documentation
+* **Updated README.md** - Enhanced feature list:
+  * Complete list of 12 indicators
+  * Complete list of 14 drawing tools
+  * Updated installation instructions
+  * Feature highlights
+
+### 🎨 UI/UX Improvements
+* **Enhanced Example App** - Updated tabbed example:
+  * Drawing Tools tab now includes all 14 tools
+  * FAB buttons for each tool type
+  * Color-coded buttons (blue, green, orange, purple)
+  * Clear buttons for each tool category
+  * Snackbar notifications with usage hints
+* **Interactive Demos** - Working examples for all tools:
+  * Text Tool with double-tap editing demo
+  * Fibonacci Extension with 3-point drag
+  * Position Tool with independent line drag
+  * Ruler Tool with statistics display
+  * All tools with visual feedback
+
+### 🔧 Technical Details
+* **InteractiveChart Enhancements**:
+  - Added drag state flags for all new tools
+  - Implemented handle detection in `onTapDown` and `onScaleStart`
+  - Added drag end logic in `_onOverlayDragEnd` for all tools
+  - Double-tap detection system for text editing
+  - Cleanup of drag flags in `setState`
+* **ChartPainter Enhancements**:
+  - Added preview rendering for all new tools
+  - Drag state parameters passed from InteractiveChart
+  - Real-time position updates during drag
+  - Enhanced visual feedback (thicker lines, opacity)
+* **Overlay Classes**:
+  - All tools extend `ChartOverlay` base class
+  - Implement `paint()`, `hitTest()`, and `copyWith()` methods
+  - Options classes with `draggable` flag and callbacks
+  - Style classes for visual customization
+  - ID-based identification for state management
+
+### 💥 Breaking Changes
+* None - Fully backward compatible with 1.0.7
+* All new features are additive
+* Existing overlays continue to work unchanged
+
+### 📊 Statistics
+* **Total Tools:** 26 (12 indicators + 14 drawing tools)
+* **Interactive Tools:** 14 (all with drag & drop)
+* **New Files Created:** 9 (tool implementations + guide)
+* **Lines of Code Added:** ~3,500+
+* **Documentation Pages:** 2 (INTEGRATION_GUIDE.md + updates)
+
+### 🎯 Use Cases
+* **Technical Analysis** - Complete suite of drawing tools
+* **Trade Planning** - Position Tool for trade visualization
+* **Pattern Recognition** - Fibonacci tools for projections
+* **Annotations** - Text, Arrow, and Circle tools
+* **Time Analysis** - Gantt Tool for period visualization
+* **Measurements** - Ruler Tool for precise calculations
+
+---
+
 ## 1.0.7
 
 **🎯 Real-time Drag Events for Trading Lines**

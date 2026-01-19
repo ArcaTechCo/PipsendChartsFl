@@ -10,6 +10,15 @@ import 'overlays/trading_line.dart';
 import 'overlays/price_zone.dart';
 import 'overlays/fibonacci_retracement.dart';
 import 'overlays/trend_line.dart';
+import 'overlays/tools/position_tool.dart';
+import 'overlays/tools/ruler_tool.dart';
+import 'overlays/tools/vertical_line.dart';
+import 'overlays/fibonacci_extension.dart';
+import 'overlays/fibonacci_fan.dart';
+import 'overlays/tools/arrow_tool.dart';
+import 'overlays/tools/circle_tool.dart';
+import 'overlays/tools/text_tool.dart';
+import 'overlays/tools/gantt_tool.dart';
 import 'indicators/indicator.dart';
 
 typedef TimeLabelGetter = String Function(int timestamp, int visibleDataCount);
@@ -33,6 +42,22 @@ class ChartPainter extends CustomPainter {
   final bool isResizingTrendLine;
   final bool isResizingTrendStart;
   final bool isResizingTrendEnd;
+  final bool isResizingPositionEntry;
+  final bool isResizingPositionSL;
+  final bool isResizingPositionTP;
+  final bool isDraggingVerticalLine;
+  final bool isResizingFibExtPointA;
+  final bool isResizingFibExtPointB;
+  final bool isResizingFibExtPointC;
+  final bool isResizingFibFanStart;
+  final bool isResizingFibFanEnd;
+  final bool isResizingArrowStart;
+  final bool isResizingArrowEnd;
+  final bool isResizingCircleCenter;
+  final bool isResizingCircleRadius;
+  final bool isDraggingTextTool;
+  final bool isResizingGanttStart;
+  final bool isResizingGanttEnd;
 
   ChartPainter({
     required this.params,
@@ -51,6 +76,22 @@ class ChartPainter extends CustomPainter {
     this.isResizingTrendLine = false,
     this.isResizingTrendStart = false,
     this.isResizingTrendEnd = false,
+    this.isResizingPositionEntry = false,
+    this.isResizingPositionSL = false,
+    this.isResizingPositionTP = false,
+    this.isDraggingVerticalLine = false,
+    this.isResizingFibExtPointA = false,
+    this.isResizingFibExtPointB = false,
+    this.isResizingFibExtPointC = false,
+    this.isResizingFibFanStart = false,
+    this.isResizingFibFanEnd = false,
+    this.isResizingArrowStart = false,
+    this.isResizingArrowEnd = false,
+    this.isResizingCircleCenter = false,
+    this.isResizingCircleRadius = false,
+    this.isDraggingTextTool = false,
+    this.isResizingGanttStart = false,
+    this.isResizingGanttEnd = false,
   });
 
   @override
@@ -245,6 +286,258 @@ class ChartPainter extends CustomPainter {
               );
             }
             draggedTrend.paint(canvas, params, isBeingDragged: true);
+          } else if (overlay is PositionTool) {
+            // PositionTool - handle individual line movement
+            if (draggedPrice != null) {
+              final PositionTool draggedPosition;
+              
+              if (isResizingPositionEntry) {
+                // Moving Entry line
+                draggedPosition = overlay.copyWith(entryPrice: draggedPrice!);
+              } else if (isResizingPositionSL) {
+                // Moving Stop Loss line
+                draggedPosition = overlay.copyWith(stopLossPrice: draggedPrice!);
+              } else if (isResizingPositionTP) {
+                // Moving Take Profit line
+                draggedPosition = overlay.copyWith(takeProfitPrice: draggedPrice!);
+              } else {
+                // No specific line, just paint with drag feedback
+                draggedPosition = overlay;
+              }
+              
+              draggedPosition.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is RulerTool) {
+            // Handle resize vs drag for RulerTool (same as TrendLine)
+            final RulerTool draggedRuler;
+            
+            if (isResizingTrendLine && draggedPosition != null) {
+              // Resizing one endpoint - calculate new timestamp from X position
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              if (isResizingTrendStart) {
+                // Resizing start point
+                draggedRuler = overlay.withPoints(
+                  startTime: newTimestamp,
+                  startPrice: newPrice,
+                );
+              } else {
+                // Resizing end point
+                draggedRuler = overlay.withPoints(
+                  endTime: newTimestamp,
+                  endPrice: newPrice,
+                );
+              }
+            } else if (draggedPosition != null) {
+              // Move entire ruler - calculate offset in both X and Y
+              final priceOffset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
+              
+              // Calculate time offset based on X movement
+              final startIndex = params.candles.indexWhere((c) => c.timestamp >= overlay.startTime);
+              if (startIndex >= 0) {
+                final startX = params.xShift + startIndex * params.candleWidth;
+                final deltaX = draggedPosition!.dx - startX;
+                final candleOffset = (deltaX / params.candleWidth).round();
+                
+                // Find new timestamps
+                final newStartIndex = (startIndex + candleOffset).clamp(0, params.candles.length - 1);
+                final endIndex = params.candles.indexWhere((c) => c.timestamp >= overlay.endTime);
+                final newEndIndex = endIndex >= 0 ? (endIndex + candleOffset).clamp(0, params.candles.length - 1) : newStartIndex;
+                
+                draggedRuler = overlay.withPoints(
+                  startTime: params.candles[newStartIndex].timestamp,
+                  startPrice: overlay.startPrice + priceOffset,
+                  endTime: params.candles[newEndIndex].timestamp,
+                  endPrice: overlay.endPrice + priceOffset,
+                );
+              } else {
+                // Fallback: just move price
+                final offset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
+                draggedRuler = overlay.withPoints(
+                  startPrice: overlay.startPrice + offset,
+                  endPrice: overlay.endPrice + offset,
+                );
+              }
+            } else {
+              // No position info, just move price
+              final offset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
+              draggedRuler = overlay.withPoints(
+                startPrice: overlay.startPrice + offset,
+                endPrice: overlay.endPrice + offset,
+              );
+            }
+            draggedRuler.paint(canvas, params, isBeingDragged: true);
+          } else if (overlay is VerticalLine) {
+            // VerticalLine - move horizontally only
+            if (draggedPosition != null && isDraggingVerticalLine) {
+              // Calculate new timestamp from X position
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              
+              final draggedVLine = overlay.copyWith(timestamp: newTimestamp);
+              draggedVLine.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is FibonacciExtension) {
+            // FibonacciExtension - move individual points
+            if (draggedPosition != null && draggedPrice != null) {
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              final FibonacciExtension draggedFibExt;
+              if (isResizingFibExtPointA) {
+                draggedFibExt = overlay.copyWith(
+                  pointATime: newTimestamp,
+                  pointAPrice: newPrice,
+                );
+              } else if (isResizingFibExtPointB) {
+                draggedFibExt = overlay.copyWith(
+                  pointBTime: newTimestamp,
+                  pointBPrice: newPrice,
+                );
+              } else if (isResizingFibExtPointC) {
+                draggedFibExt = overlay.copyWith(
+                  pointCTime: newTimestamp,
+                  pointCPrice: newPrice,
+                );
+              } else {
+                draggedFibExt = overlay;
+              }
+              draggedFibExt.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is FibonacciFan) {
+            // FibonacciFan - move individual points
+            if (draggedPosition != null && draggedPrice != null) {
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              final FibonacciFan draggedFibFan;
+              if (isResizingFibFanStart) {
+                draggedFibFan = overlay.copyWith(
+                  startTime: newTimestamp,
+                  startPrice: newPrice,
+                );
+              } else if (isResizingFibFanEnd) {
+                draggedFibFan = overlay.copyWith(
+                  endTime: newTimestamp,
+                  endPrice: newPrice,
+                );
+              } else {
+                draggedFibFan = overlay;
+              }
+              draggedFibFan.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is ArrowTool) {
+            // ArrowTool - move individual points
+            if (draggedPosition != null && draggedPrice != null) {
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              final ArrowTool draggedArrow;
+              if (isResizingArrowStart) {
+                draggedArrow = overlay.withPoints(
+                  startTime: newTimestamp,
+                  startPrice: newPrice,
+                );
+              } else if (isResizingArrowEnd) {
+                draggedArrow = overlay.withPoints(
+                  endTime: newTimestamp,
+                  endPrice: newPrice,
+                );
+              } else {
+                draggedArrow = overlay;
+              }
+              draggedArrow.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is CircleTool) {
+            // CircleTool - move center or resize radius
+            if (draggedPosition != null && draggedPrice != null) {
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              final CircleTool draggedCircle;
+              if (isResizingCircleCenter) {
+                draggedCircle = overlay.copyWith(
+                  centerTime: newTimestamp,
+                  centerPrice: newPrice,
+                );
+              } else if (isResizingCircleRadius) {
+                final radiusTime = (newTimestamp - overlay.centerTime).abs();
+                final radiusPrice = (newPrice - overlay.centerPrice).abs();
+                draggedCircle = overlay.copyWith(
+                  radiusTime: radiusTime,
+                  radiusPrice: radiusPrice,
+                );
+              } else {
+                draggedCircle = overlay;
+              }
+              draggedCircle.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is TextTool) {
+            // TextTool - move text
+            if (draggedPosition != null && draggedPrice != null && isDraggingTextTool) {
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              final draggedText = overlay.copyWith(
+                timestamp: newTimestamp,
+                price: newPrice,
+              );
+              draggedText.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
+          } else if (overlay is GanttTool) {
+            // GanttTool - move or resize
+            if (draggedPosition != null && draggedPrice != null) {
+              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
+              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newPrice = draggedPrice!;
+              
+              final GanttTool draggedGantt;
+              if (isResizingGanttStart) {
+                draggedGantt = overlay.copyWith(
+                  startTime: newTimestamp,
+                  price: newPrice,
+                );
+              } else if (isResizingGanttEnd) {
+                draggedGantt = overlay.copyWith(
+                  endTime: newTimestamp,
+                  price: newPrice,
+                );
+              } else {
+                draggedGantt = overlay;
+              }
+              draggedGantt.paint(canvas, params, isBeingDragged: true);
+            } else {
+              overlay.paint(canvas, params, isBeingDragged: true);
+            }
           } else {
             overlay.paint(canvas, params, isBeingDragged: true);
           }

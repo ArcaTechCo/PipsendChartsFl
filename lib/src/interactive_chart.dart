@@ -17,6 +17,15 @@ import 'overlays/trading_line.dart';
 import 'overlays/price_zone.dart';
 import 'overlays/fibonacci_retracement.dart';
 import 'overlays/trend_line.dart';
+import 'overlays/tools/position_tool.dart';
+import 'overlays/tools/ruler_tool.dart';
+import 'overlays/tools/vertical_line.dart';
+import 'overlays/fibonacci_extension.dart';
+import 'overlays/fibonacci_fan.dart';
+import 'overlays/tools/arrow_tool.dart';
+import 'overlays/tools/circle_tool.dart';
+import 'overlays/tools/text_tool.dart';
+import 'overlays/tools/gantt_tool.dart';
 import 'indicators/indicator.dart';
 
 class InteractiveChart extends StatefulWidget {
@@ -205,6 +214,26 @@ class _InteractiveChartState extends State<InteractiveChart> {
   bool _isResizingTrendLine = false; // Track if resizing a TrendLine
   bool _isResizingTrendStart = false; // Resizing start point of TrendLine
   bool _isResizingTrendEnd = false; // Resizing end point of TrendLine
+  bool _isResizingPositionEntry = false; // Resizing Entry line of PositionTool
+  bool _isResizingPositionSL = false; // Resizing Stop Loss line of PositionTool
+  bool _isResizingPositionTP = false; // Resizing Take Profit line of PositionTool
+  bool _isDraggingVerticalLine = false; // Dragging VerticalLine
+  bool _isResizingFibExtPointA = false; // Resizing point A of FibonacciExtension
+  bool _isResizingFibExtPointB = false; // Resizing point B of FibonacciExtension
+  bool _isResizingFibExtPointC = false; // Resizing point C of FibonacciExtension
+  bool _isResizingFibFanStart = false; // Resizing start point of FibonacciFan
+  bool _isResizingFibFanEnd = false; // Resizing end point of FibonacciFan
+  bool _isResizingArrowStart = false; // Resizing start point of ArrowTool
+  bool _isResizingArrowEnd = false; // Resizing end point of ArrowTool
+  bool _isResizingCircleCenter = false; // Resizing center of CircleTool
+  bool _isResizingCircleRadius = false; // Resizing radius of CircleTool
+  bool _isDraggingTextTool = false; // Dragging TextTool
+  bool _isResizingGanttStart = false; // Resizing start of GanttTool
+  bool _isResizingGanttEnd = false; // Resizing end of GanttTool
+  
+  // Double tap detection for text editing
+  DateTime? _lastTapTime;
+  Offset? _lastTapPosition;
   
   // Vertical zoom and pan state
   late double _verticalZoomFactor; // 1.0 = fit to screen, >1.0 = zoomed out (more padding)
@@ -404,6 +433,22 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   isResizingTrendLine: _isResizingTrendLine,
                   isResizingTrendStart: _isResizingTrendStart,
                   isResizingTrendEnd: _isResizingTrendEnd,
+                  isResizingPositionEntry: _isResizingPositionEntry,
+                  isResizingPositionSL: _isResizingPositionSL,
+                  isResizingPositionTP: _isResizingPositionTP,
+                  isDraggingVerticalLine: _isDraggingVerticalLine,
+                  isResizingFibExtPointA: _isResizingFibExtPointA,
+                  isResizingFibExtPointB: _isResizingFibExtPointB,
+                  isResizingFibExtPointC: _isResizingFibExtPointC,
+                  isResizingFibFanStart: _isResizingFibFanStart,
+                  isResizingFibFanEnd: _isResizingFibFanEnd,
+                  isResizingArrowStart: _isResizingArrowStart,
+                  isResizingArrowEnd: _isResizingArrowEnd,
+                  isResizingCircleCenter: _isResizingCircleCenter,
+                  isResizingCircleRadius: _isResizingCircleRadius,
+                  isDraggingTextTool: _isDraggingTextTool,
+                  isResizingGanttStart: _isResizingGanttStart,
+                  isResizingGanttEnd: _isResizingGanttEnd,
                 ),
               ),
             );
@@ -530,6 +575,239 @@ class _InteractiveChartState extends State<InteractiveChart> {
                         _hasDragged = false;
                       });
                       return; // Exit early - handle hit
+                    }
+                  } else if (overlay is RulerTool && overlay.options.draggable) {
+                    // RulerTool handle detection (same as TrendLine)
+                    if (overlay.hitTestStartHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.startPrice;
+                        _dragStartPosition = details.localPosition;
+                        _originalPrice = overlay.startPrice;
+                        _isResizingTrendLine = true;
+                        _isResizingTrendStart = true;
+                        _isResizingTrendEnd = false;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - handle hit
+                    } else if (overlay.hitTestEndHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.endPrice;
+                        _dragStartPosition = details.localPosition;
+                        _originalPrice = overlay.endPrice;
+                        _isResizingTrendLine = true;
+                        _isResizingTrendStart = false;
+                        _isResizingTrendEnd = true;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - handle hit
+                    }
+                  } else if (overlay is PositionTool && overlay.options.draggable) {
+                    // PositionTool line detection
+                    if (overlay.hitTestEntryLine(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.entryPrice;
+                        _originalPrice = overlay.entryPrice;
+                        _isResizingPositionEntry = true;
+                        _isResizingPositionSL = false;
+                        _isResizingPositionTP = false;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    } else if (overlay.hitTestStopLossLine(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.stopLossPrice;
+                        _originalPrice = overlay.stopLossPrice;
+                        _isResizingPositionEntry = false;
+                        _isResizingPositionSL = true;
+                        _isResizingPositionTP = false;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    } else if (overlay.hitTestTakeProfitLine(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.takeProfitPrice;
+                        _originalPrice = overlay.takeProfitPrice;
+                        _isResizingPositionEntry = false;
+                        _isResizingPositionSL = false;
+                        _isResizingPositionTP = true;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    }
+                  } else if (overlay is VerticalLine && overlay.options.draggable) {
+                    // VerticalLine detection
+                    if (overlay.hitTest(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPosition = details.localPosition;
+                        _isDraggingVerticalLine = true;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    }
+                  } else if (overlay is FibonacciExtension && overlay.options.draggable) {
+                    // FibonacciExtension point detection
+                    if (overlay.hitTestPointA(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.pointAPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingFibExtPointA = true;
+                        _isResizingFibExtPointB = false;
+                        _isResizingFibExtPointC = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestPointB(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.pointBPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingFibExtPointA = false;
+                        _isResizingFibExtPointB = true;
+                        _isResizingFibExtPointC = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestPointC(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.pointCPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingFibExtPointA = false;
+                        _isResizingFibExtPointB = false;
+                        _isResizingFibExtPointC = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is FibonacciFan && overlay.options.draggable) {
+                    // FibonacciFan point detection
+                    if (overlay.hitTestStartPoint(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.startPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingFibFanStart = true;
+                        _isResizingFibFanEnd = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestEndPoint(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.endPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingFibFanStart = false;
+                        _isResizingFibFanEnd = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is ArrowTool && overlay.options.draggable) {
+                    // ArrowTool point detection
+                    if (overlay.hitTestStartHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.startPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingArrowStart = true;
+                        _isResizingArrowEnd = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestEndHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.endPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingArrowStart = false;
+                        _isResizingArrowEnd = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is CircleTool && overlay.options.draggable) {
+                    // CircleTool handle detection
+                    if (overlay.hitTestCenterHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.centerPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingCircleCenter = true;
+                        _isResizingCircleRadius = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestRadiusHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.centerPrice;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingCircleCenter = false;
+                        _isResizingCircleRadius = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is TextTool && overlay.options.draggable) {
+                    // TextTool detection
+                    if (overlay.hitTest(details.localPosition, params)) {
+                      // Check for double tap to edit
+                      final now = DateTime.now();
+                      final isDoubleTap = _lastTapTime != null &&
+                          now.difference(_lastTapTime!).inMilliseconds < 300 &&
+                          _lastTapPosition != null &&
+                          (details.localPosition - _lastTapPosition!).distance < 20;
+                      
+                      if (isDoubleTap && overlay.options.onEdit != null) {
+                        // Double tap detected - trigger edit
+                        _lastTapTime = null;
+                        _lastTapPosition = null;
+                        overlay.options.onEdit!(overlay.text);
+                        return;
+                      }
+                      
+                      // Single tap - prepare for drag
+                      _lastTapTime = now;
+                      _lastTapPosition = details.localPosition;
+                      
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.price;
+                        _dragStartPosition = details.localPosition;
+                        _isDraggingTextTool = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is GanttTool && overlay.options.draggable) {
+                    // GanttTool handle detection
+                    if (overlay.hitTestStartHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.price;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingGanttStart = true;
+                        _isResizingGanttEnd = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestEndHandle(details.localPosition, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.price;
+                        _dragStartPosition = details.localPosition;
+                        _isResizingGanttStart = false;
+                        _isResizingGanttEnd = true;
+                        _hasDragged = false;
+                      });
+                      return;
                     }
                   }
                 }
@@ -692,6 +970,220 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       });
                       return; // Exit early - handle hit
                     }
+                  } else if (overlay is RulerTool && overlay.options.draggable) {
+                    // RulerTool handle detection (same as TrendLine)
+                    if (overlay.hitTestStartHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.startPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _originalPrice = overlay.startPrice;
+                        _isResizingTrendLine = true;
+                        _isResizingTrendStart = true;
+                        _isResizingTrendEnd = false;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - handle hit
+                    } else if (overlay.hitTestEndHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.endPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _originalPrice = overlay.endPrice;
+                        _isResizingTrendLine = true;
+                        _isResizingTrendStart = false;
+                        _isResizingTrendEnd = true;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - handle hit
+                    }
+                  } else if (overlay is PositionTool && overlay.options.draggable) {
+                    // PositionTool line detection
+                    if (overlay.hitTestEntryLine(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.entryPrice;
+                        _originalPrice = overlay.entryPrice;
+                        _isResizingPositionEntry = true;
+                        _isResizingPositionSL = false;
+                        _isResizingPositionTP = false;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    } else if (overlay.hitTestStopLossLine(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.stopLossPrice;
+                        _originalPrice = overlay.stopLossPrice;
+                        _isResizingPositionEntry = false;
+                        _isResizingPositionSL = true;
+                        _isResizingPositionTP = false;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    } else if (overlay.hitTestTakeProfitLine(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.takeProfitPrice;
+                        _originalPrice = overlay.takeProfitPrice;
+                        _isResizingPositionEntry = false;
+                        _isResizingPositionSL = false;
+                        _isResizingPositionTP = true;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    }
+                  } else if (overlay is VerticalLine && overlay.options.draggable) {
+                    // VerticalLine detection
+                    if (overlay.hitTest(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isDraggingVerticalLine = true;
+                        _hasDragged = false;
+                      });
+                      return; // Exit early - line hit
+                    }
+                  } else if (overlay is FibonacciExtension && overlay.options.draggable) {
+                    // FibonacciExtension point detection
+                    if (overlay.hitTestPointA(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.pointAPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingFibExtPointA = true;
+                        _isResizingFibExtPointB = false;
+                        _isResizingFibExtPointC = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestPointB(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.pointBPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingFibExtPointA = false;
+                        _isResizingFibExtPointB = true;
+                        _isResizingFibExtPointC = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestPointC(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.pointCPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingFibExtPointA = false;
+                        _isResizingFibExtPointB = false;
+                        _isResizingFibExtPointC = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is FibonacciFan && overlay.options.draggable) {
+                    // FibonacciFan point detection
+                    if (overlay.hitTestStartPoint(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.startPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingFibFanStart = true;
+                        _isResizingFibFanEnd = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestEndPoint(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.endPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingFibFanStart = false;
+                        _isResizingFibFanEnd = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is ArrowTool && overlay.options.draggable) {
+                    // ArrowTool point detection
+                    if (overlay.hitTestStartHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.startPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingArrowStart = true;
+                        _isResizingArrowEnd = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestEndHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.endPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingArrowStart = false;
+                        _isResizingArrowEnd = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is CircleTool && overlay.options.draggable) {
+                    // CircleTool handle detection
+                    if (overlay.hitTestCenterHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.centerPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingCircleCenter = true;
+                        _isResizingCircleRadius = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestRadiusHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.centerPrice;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingCircleCenter = false;
+                        _isResizingCircleRadius = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is TextTool && overlay.options.draggable) {
+                    // TextTool detection
+                    if (overlay.hitTest(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.price;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isDraggingTextTool = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
+                  } else if (overlay is GanttTool && overlay.options.draggable) {
+                    // GanttTool handle detection
+                    if (overlay.hitTestStartHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.price;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingGanttStart = true;
+                        _isResizingGanttEnd = false;
+                        _hasDragged = false;
+                      });
+                      return;
+                    } else if (overlay.hitTestEndHandle(details.localFocalPoint, params)) {
+                      setState(() {
+                        _draggedOverlay = overlay;
+                        _dragStartPrice = overlay.price;
+                        _dragStartPosition = details.localFocalPoint;
+                        _isResizingGanttStart = false;
+                        _isResizingGanttEnd = true;
+                        _hasDragged = false;
+                      });
+                      return;
+                    }
                   }
                 }
                 
@@ -780,6 +1272,42 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     return; // _onOverlayDragEnd already calls setState
                   } else if (_draggedOverlay is TrendLine) {
                     // For TrendLine, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is PositionTool) {
+                    // For PositionTool, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is RulerTool) {
+                    // For RulerTool, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is VerticalLine) {
+                    // For VerticalLine, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is FibonacciExtension) {
+                    // For FibonacciExtension, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is FibonacciFan) {
+                    // For FibonacciFan, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is ArrowTool) {
+                    // For ArrowTool, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is CircleTool) {
+                    // For CircleTool, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is TextTool) {
+                    // For TextTool, always call if dragged
+                    _onOverlayDragEnd();
+                    return; // _onOverlayDragEnd already calls setState
+                  } else if (_draggedOverlay is GanttTool) {
+                    // For GanttTool, always call if dragged
                     _onOverlayDragEnd();
                     return; // _onOverlayDragEnd already calls setState
                   }
@@ -1172,6 +1700,277 @@ class _InteractiveChartState extends State<InteractiveChart> {
           );
         }
       }
+    } else if (_draggedOverlay is PositionTool) {
+      // PositionTool drag - handle individual line movement
+      final positionTool = _draggedOverlay as PositionTool;
+      if (_dragStartPrice != null) {
+        // Determine which line was dragged and update only that line
+        if (_isResizingPositionEntry) {
+          // Moving Entry line
+          positionTool.options.onPositionChanged?.call(
+            _dragStartPrice!,
+            positionTool.stopLossPrice,
+            positionTool.takeProfitPrice,
+          );
+        } else if (_isResizingPositionSL) {
+          // Moving Stop Loss line
+          positionTool.options.onPositionChanged?.call(
+            positionTool.entryPrice,
+            _dragStartPrice!,
+            positionTool.takeProfitPrice,
+          );
+        } else if (_isResizingPositionTP) {
+          // Moving Take Profit line
+          positionTool.options.onPositionChanged?.call(
+            positionTool.entryPrice,
+            positionTool.stopLossPrice,
+            _dragStartPrice!,
+          );
+        }
+      }
+    } else if (_draggedOverlay is RulerTool) {
+      // RulerTool drag/resize (same logic as TrendLine)
+      final rulerTool = _draggedOverlay as RulerTool;
+      final params = _prevParams!;
+      
+      if (_isResizingTrendLine && _dragStartPosition != null) {
+        // Resizing one endpoint - calculate new timestamp from X position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        if (_isResizingTrendStart) {
+          // Resizing start point
+          rulerTool.options.onMoved?.call(
+            newTimestamp,
+            newPrice,
+            rulerTool.endTime,
+            rulerTool.endPrice,
+          );
+        } else if (_isResizingTrendEnd) {
+          // Resizing end point
+          rulerTool.options.onMoved?.call(
+            rulerTool.startTime,
+            rulerTool.startPrice,
+            newTimestamp,
+            newPrice,
+          );
+        }
+      } else if (_dragStartPosition != null) {
+        // Regular drag (move entire ruler) - calculate offset in both X and Y
+        // Use initial price to calculate offset, not current price
+        final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
+        final priceOffset = _dragStartPrice! - initialPrice;
+        
+        // Calculate time offset based on X movement
+        final startIndex = params.candles.indexWhere((c) => c.timestamp >= rulerTool.startTime);
+        if (startIndex >= 0) {
+          final startX = params.xShift + startIndex * params.candleWidth;
+          final deltaX = _dragStartPosition!.dx - startX;
+          final candleOffset = (deltaX / params.candleWidth).round();
+          
+          // Find new timestamps
+          final newStartIndex = (startIndex + candleOffset).clamp(0, params.candles.length - 1);
+          final endIndex = params.candles.indexWhere((c) => c.timestamp >= rulerTool.endTime);
+          final newEndIndex = endIndex >= 0 ? (endIndex + candleOffset).clamp(0, params.candles.length - 1) : newStartIndex;
+          
+          rulerTool.options.onMoved?.call(
+            params.candles[newStartIndex].timestamp,
+            rulerTool.startPrice + priceOffset,
+            params.candles[newEndIndex].timestamp,
+            rulerTool.endPrice + priceOffset,
+          );
+        }
+      }
+    } else if (_draggedOverlay is VerticalLine) {
+      // VerticalLine drag - move horizontally only
+      final verticalLine = _draggedOverlay as VerticalLine;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _isDraggingVerticalLine) {
+        // Calculate new timestamp from X position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        
+        verticalLine.options.onMoved?.call(newTimestamp);
+      }
+    } else if (_draggedOverlay is FibonacciExtension) {
+      // FibonacciExtension drag - move individual points
+      final fibExt = _draggedOverlay as FibonacciExtension;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _dragStartPrice != null) {
+        // Calculate new timestamp and price from position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        // Determine which point was dragged and update
+        if (_isResizingFibExtPointA) {
+          fibExt.options.onMoved?.call(
+            newTimestamp,
+            newPrice,
+            fibExt.pointBTime,
+            fibExt.pointBPrice,
+            fibExt.pointCTime,
+            fibExt.pointCPrice,
+          );
+        } else if (_isResizingFibExtPointB) {
+          fibExt.options.onMoved?.call(
+            fibExt.pointATime,
+            fibExt.pointAPrice,
+            newTimestamp,
+            newPrice,
+            fibExt.pointCTime,
+            fibExt.pointCPrice,
+          );
+        } else if (_isResizingFibExtPointC) {
+          fibExt.options.onMoved?.call(
+            fibExt.pointATime,
+            fibExt.pointAPrice,
+            fibExt.pointBTime,
+            fibExt.pointBPrice,
+            newTimestamp,
+            newPrice,
+          );
+        }
+      }
+    } else if (_draggedOverlay is FibonacciFan) {
+      // FibonacciFan drag - move individual points
+      final fibFan = _draggedOverlay as FibonacciFan;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _dragStartPrice != null) {
+        // Calculate new timestamp and price from position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        // Determine which point was dragged and update
+        if (_isResizingFibFanStart) {
+          fibFan.options.onMoved?.call(
+            newTimestamp,
+            newPrice,
+            fibFan.endTime,
+            fibFan.endPrice,
+          );
+        } else if (_isResizingFibFanEnd) {
+          fibFan.options.onMoved?.call(
+            fibFan.startTime,
+            fibFan.startPrice,
+            newTimestamp,
+            newPrice,
+          );
+        }
+      }
+    } else if (_draggedOverlay is ArrowTool) {
+      // ArrowTool drag - move individual points
+      final arrow = _draggedOverlay as ArrowTool;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _dragStartPrice != null) {
+        // Calculate new timestamp and price from position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        // Determine which point was dragged and update
+        if (_isResizingArrowStart) {
+          arrow.options.onMoved?.call(
+            newTimestamp,
+            newPrice,
+            arrow.endTime,
+            arrow.endPrice,
+          );
+        } else if (_isResizingArrowEnd) {
+          arrow.options.onMoved?.call(
+            arrow.startTime,
+            arrow.startPrice,
+            newTimestamp,
+            newPrice,
+          );
+        }
+      }
+    } else if (_draggedOverlay is CircleTool) {
+      // CircleTool drag - move center or resize radius
+      final circle = _draggedOverlay as CircleTool;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _dragStartPrice != null) {
+        // Calculate new timestamp and price from position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        if (_isResizingCircleCenter) {
+          // Moving center - keep radius the same
+          circle.options.onMoved?.call(
+            newTimestamp,
+            newPrice,
+            circle.radiusTime,
+            circle.radiusPrice,
+          );
+        } else if (_isResizingCircleRadius) {
+          // Resizing radius - calculate new radius from center to drag position
+          final radiusTime = (newTimestamp - circle.centerTime).abs();
+          final radiusPrice = (newPrice - circle.centerPrice).abs();
+          
+          circle.options.onMoved?.call(
+            circle.centerTime,
+            circle.centerPrice,
+            radiusTime,
+            radiusPrice,
+          );
+        }
+      }
+    } else if (_draggedOverlay is TextTool) {
+      // TextTool drag - move text position
+      final textTool = _draggedOverlay as TextTool;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _dragStartPrice != null) {
+        // Calculate new timestamp and price from position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        textTool.options.onMoved?.call(newTimestamp, newPrice);
+      }
+    } else if (_draggedOverlay is GanttTool) {
+      // GanttTool drag - move or resize
+      final gantt = _draggedOverlay as GanttTool;
+      final params = _prevParams!;
+      
+      if (_dragStartPosition != null && _dragStartPrice != null) {
+        // Calculate new timestamp and price from position
+        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
+        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
+        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newPrice = _dragStartPrice!;
+        
+        if (_isResizingGanttStart) {
+          // Resizing start - keep end the same
+          gantt.options.onMoved?.call(
+            newTimestamp,
+            gantt.endTime,
+            newPrice,
+          );
+        } else if (_isResizingGanttEnd) {
+          // Resizing end - keep start the same
+          gantt.options.onMoved?.call(
+            gantt.startTime,
+            newTimestamp,
+            newPrice,
+          );
+        }
+      }
     }
     
     // Clear drag state and trigger rebuild
@@ -1188,6 +1987,22 @@ class _InteractiveChartState extends State<InteractiveChart> {
       _isResizingTrendLine = false;
       _isResizingTrendStart = false;
       _isResizingTrendEnd = false;
+      _isResizingPositionEntry = false;
+      _isResizingPositionSL = false;
+      _isResizingPositionTP = false;
+      _isDraggingVerticalLine = false;
+      _isResizingFibExtPointA = false;
+      _isResizingFibExtPointB = false;
+      _isResizingFibExtPointC = false;
+      _isResizingFibFanStart = false;
+      _isResizingFibFanEnd = false;
+      _isResizingArrowStart = false;
+      _isResizingArrowEnd = false;
+      _isResizingCircleCenter = false;
+      _isResizingCircleRadius = false;
+      _isDraggingTextTool = false;
+      _isResizingGanttStart = false;
+      _isResizingGanttEnd = false;
     });
   }
 }

@@ -93,6 +93,53 @@ class IndicatorCalculator {
     return result;
   }
 
+  /// Calculates Weighted Moving Average (WMA).
+  ///
+  /// [data] is the input data series.
+  /// [period] is the number of periods to average.
+  ///
+  /// WMA assigns linearly decreasing weights to older values.
+  /// Most recent value has weight = period, second most recent = period-1, etc.
+  ///
+  /// Returns a list of the same length as [data], with nulls for
+  /// the first [period-1] values.
+  static List<double?> wma(List<double?> data, int period) {
+    if (data.length < period) {
+      return List.filled(data.length, null);
+    }
+
+    final result = <double?>[];
+
+    // Fill initial values with null
+    for (int i = 0; i < period - 1; i++) {
+      result.add(null);
+    }
+
+    // Calculate WMA for remaining values
+    // Weight sum = period * (period + 1) / 2
+    final weightSum = period * (period + 1) / 2;
+
+    for (int i = period - 1; i < data.length; i++) {
+      double weightedSum = 0;
+      int validCount = 0;
+
+      for (int j = 0; j < period; j++) {
+        final value = data[i - j];
+        if (value != null) {
+          // Weight decreases linearly: most recent gets highest weight
+          final weight = period - j;
+          weightedSum += value * weight;
+          validCount++;
+        }
+      }
+
+      // Only calculate if we have all values in the period
+      result.add(validCount == period ? weightedSum / weightSum : null);
+    }
+
+    return result;
+  }
+
   /// Calculates standard deviation for a list of values.
   ///
   /// Returns 0 if the list is empty or has only one element.

@@ -34,6 +34,9 @@ export 'src/indicators/bollinger_bands_indicator.dart';
 export 'src/indicators/macd_indicator.dart';
 export 'src/indicators/sma_indicator.dart';
 export 'src/indicators/ema_indicator.dart';
+export 'src/indicators/wma_indicator.dart';
+export 'src/indicators/trading_sessions_indicator.dart';
+export 'src/indicators/volume_profile_indicator.dart';
 export 'src/indicators/stochastic_indicator.dart';
 export 'src/indicators/atr_indicator.dart';
 export 'src/indicators/adx_indicator.dart';
@@ -59,8 +62,12 @@ export 'src/overlays/price_zone_options.dart';
 export 'src/overlays/price_zone_manager.dart';
 export 'src/overlays/price_zone_event.dart';
 
-// Fibonacci retracement overlays
+// Fibonacci overlays
 export 'src/overlays/fibonacci_retracement.dart';
+export 'src/overlays/fibonacci_extension.dart';
+export 'src/overlays/fibonacci_extension_options.dart';
+export 'src/overlays/fibonacci_fan.dart';
+export 'src/overlays/fibonacci_fan_options.dart';
 export 'src/overlays/fibonacci_style.dart';
 export 'src/overlays/fibonacci_options.dart';
 export 'src/overlays/fibonacci_manager.dart';
@@ -72,3 +79,13 @@ export 'src/overlays/trend_line_style.dart';
 export 'src/overlays/trend_line_options.dart';
 export 'src/overlays/trend_line_manager.dart';
 export 'src/overlays/trend_line_event.dart';
+
+// Drawing Tools
+export 'src/overlays/tools/position_tool.dart';
+export 'src/overlays/tools/ruler_tool.dart';
+export 'src/overlays/tools/vertical_line.dart';
+export 'src/overlays/tools/arrow_tool.dart';
+export 'src/overlays/tools/circle_tool.dart';
+export 'src/overlays/tools/text_tool.dart';
+export 'src/overlays/tools/brush_tool.dart';
+export 'src/overlays/tools/gantt_tool.dart';

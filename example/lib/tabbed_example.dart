@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:pipsend_charts/pipsend_charts.dart';
 import 'mock_data.dart';
@@ -22,6 +23,36 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   final TrendLineManager _trendLineManager = TrendLineManager();
   final InteractiveChartController _chartController = InteractiveChartController();
   
+  // Position Tools
+  final List<PositionTool> _positionTools = [];
+  
+  // Ruler Tools
+  final List<RulerTool> _rulerTools = [];
+  
+  // Vertical Lines
+  final List<VerticalLine> _verticalLines = [];
+  
+  // Fibonacci Extensions
+  final List<FibonacciExtension> _fibonacciExtensions = [];
+  
+  // Fibonacci Fans
+  final List<FibonacciFan> _fibonacciFans = [];
+  
+  // Arrow Tools
+  final List<ArrowTool> _arrowTools = [];
+  
+  // Circle Tools
+  final List<CircleTool> _circleTools = [];
+  
+  // Text Tools
+  final List<TextTool> _textTools = [];
+  
+  // Brush Tools
+  final List<BrushTool> _brushTools = [];
+  
+  // Gantt Tools
+  final List<GanttTool> _ganttTools = [];
+  
   // Settings
   bool _darkMode = true;
   bool _showVolume = true;
@@ -33,6 +64,9 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
   bool _showSMA50 = false;
   bool _showEMA12 = false;
   bool _showEMA26 = false;
+  bool _showWMA20 = false;
+  bool _showTradingSessions = false;
+  bool _showVolumeProfile = false;
   bool _showRSI = false;
   bool _showMACD = false;
   bool _showStochastic = false;
@@ -259,6 +293,12 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
                 const SizedBox(width: 8),
                 _buildToggleChip('EMA(26)', _showEMA26, (v) => setState(() => _showEMA26 = v)),
                 const SizedBox(width: 8),
+                _buildToggleChip('WMA(20)', _showWMA20, (v) => setState(() => _showWMA20 = v)),
+                const SizedBox(width: 8),
+                _buildToggleChip('Sessions', _showTradingSessions, (v) => setState(() => _showTradingSessions = v)),
+                const SizedBox(width: 8),
+                _buildToggleChip('Vol Profile', _showVolumeProfile, (v) => setState(() => _showVolumeProfile = v)),
+                const SizedBox(width: 8),
                 _buildToggleChip('RSI', _showRSI, (v) => setState(() => _showRSI = v)),
                 const SizedBox(width: 8),
                 _buildToggleChip('MACD', _showMACD, (v) => setState(() => _showMACD = v)),
@@ -294,6 +334,9 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
                 if (_showSMA50) SMAIndicator(period: 50, style: SMAStyle(lineColor: Colors.green)),
                 if (_showEMA12) EMAIndicator(period: 12, style: EMAStyle(lineColor: Colors.orange)),
                 if (_showEMA26) EMAIndicator(period: 26, style: EMAStyle(lineColor: Colors.red)),
+                if (_showWMA20) WMAIndicator(period: 20, style: WMAStyle(lineColor: Colors.purple)),
+                if (_showTradingSessions) TradingSessionsIndicator(),
+                if (_showVolumeProfile) VolumeProfileIndicator(bins: 24),
                 if (_showRSI) RSIIndicator(period: 14, panel: IndicatorPanel.separate(height: 0.2)),
                 if (_showMACD) MACDIndicator(panel: IndicatorPanel.separate(height: 0.25)),
                 if (_showStochastic) StochasticIndicator(kPeriod: 14, dPeriod: 3, panel: IndicatorPanel.separate(height: 0.2)),
@@ -617,7 +660,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
             Container(
               padding: const EdgeInsets.all(8.0),
               child: Text(
-                'Fibonacci: ${_fibonacciManager.count} | Trend Lines: ${_trendLineManager.count}',
+                'Tools: Arrow: ${_arrowTools.length} | Circle: ${_circleTools.length} | Text: ${_textTools.length} | Brush: ${_brushTools.length} | Gantt: ${_ganttTools.length}',
                 style: const TextStyle(fontSize: 12),
               ),
             ),
@@ -627,7 +670,7 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
                 padding: const EdgeInsets.all(24.0),
                 child: InteractiveChart(
                   candles: _data,
-                  overlays: [..._fibonacciManager.fibonaccis, ..._trendLineManager.trendLines],
+                  overlays: [..._fibonacciManager.fibonaccis, ..._fibonacciExtensions, ..._fibonacciFans, ..._trendLineManager.trendLines, ..._positionTools, ..._rulerTools, ..._verticalLines, ..._arrowTools, ..._circleTools, ..._textTools, ..._brushTools, ..._ganttTools],
                   style: ChartStyle(
                     showVolume: _showVolume,
                     volumeColor: Colors.grey.withOpacity(0.5),
@@ -654,6 +697,72 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton.small(
+            heroTag: 'add_position',
+            onPressed: () => _addPosition(context),
+            tooltip: 'Add Position',
+            backgroundColor: Colors.blue[700],
+            child: const Icon(Icons.add_chart, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_positions',
+            onPressed: () {
+              final count = _positionTools.length;
+              setState(() => _positionTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count positions')),
+              );
+            },
+            tooltip: 'Clear Positions',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear_all, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_ruler',
+            onPressed: () => _addRuler(context),
+            tooltip: 'Add Ruler',
+            backgroundColor: Colors.yellow[700],
+            child: const Icon(Icons.straighten, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_rulers',
+            onPressed: () {
+              final count = _rulerTools.length;
+              setState(() => _rulerTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count rulers')),
+              );
+            },
+            tooltip: 'Clear Rulers',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_vline',
+            onPressed: () => _addVerticalLine(context),
+            tooltip: 'Add Vertical Line',
+            backgroundColor: Colors.purple[700],
+            child: const Icon(Icons.more_vert, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_vlines',
+            onPressed: () {
+              final count = _verticalLines.length;
+              setState(() => _verticalLines.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count vertical lines')),
+              );
+            },
+            tooltip: 'Clear Vertical Lines',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
             heroTag: 'add_fib',
             onPressed: () => _addFibonacci(context),
             tooltip: 'Add Fibonacci',
@@ -676,6 +785,50 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
           ),
           const SizedBox(height: 16),
           FloatingActionButton.small(
+            heroTag: 'add_fib_ext',
+            onPressed: () => _addFibonacciExtension(context),
+            tooltip: 'Add Fibonacci Extension',
+            backgroundColor: Colors.deepPurple[700],
+            child: const Text('Ext', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_fib_ext',
+            onPressed: () {
+              final count = _fibonacciExtensions.length;
+              setState(() => _fibonacciExtensions.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count Fibonacci extensions')),
+              );
+            },
+            tooltip: 'Clear Fibonacci Extensions',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_fib_fan',
+            onPressed: () => _addFibonacciFan(context),
+            tooltip: 'Add Fibonacci Fan',
+            backgroundColor: Colors.indigo[700],
+            child: const Text('Fan', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_fib_fan',
+            onPressed: () {
+              final count = _fibonacciFans.length;
+              setState(() => _fibonacciFans.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count Fibonacci fans')),
+              );
+            },
+            tooltip: 'Clear Fibonacci Fans',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
             heroTag: 'add_trend',
             onPressed: () => _addTrendLine(context),
             tooltip: 'Add Trend Line',
@@ -695,6 +848,116 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
             tooltip: 'Clear Trend Lines',
             backgroundColor: Colors.grey[700],
             child: const Icon(Icons.trending_flat, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_arrow',
+            onPressed: () => _addArrowTool(context),
+            tooltip: 'Add Arrow',
+            backgroundColor: Colors.orange[700],
+            child: const Icon(Icons.arrow_forward, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_arrow',
+            onPressed: () {
+              final count = _arrowTools.length;
+              setState(() => _arrowTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count arrows')),
+              );
+            },
+            tooltip: 'Clear Arrows',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_circle',
+            onPressed: () => _addCircleTool(context),
+            tooltip: 'Add Circle',
+            backgroundColor: Colors.teal[700],
+            child: const Icon(Icons.circle_outlined, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_circle',
+            onPressed: () {
+              final count = _circleTools.length;
+              setState(() => _circleTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count circles')),
+              );
+            },
+            tooltip: 'Clear Circles',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_text',
+            onPressed: () => _addTextTool(context),
+            tooltip: 'Add Text',
+            backgroundColor: Colors.purple[700],
+            child: const Icon(Icons.text_fields, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_text',
+            onPressed: () {
+              final count = _textTools.length;
+              setState(() => _textTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count text annotations')),
+              );
+            },
+            tooltip: 'Clear Text',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_brush',
+            onPressed: () => _addBrushTool(context),
+            tooltip: 'Add Brush',
+            backgroundColor: Colors.deepOrange[700],
+            child: const Icon(Icons.brush, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_brush',
+            onPressed: () {
+              final count = _brushTools.length;
+              setState(() => _brushTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count brush strokes')),
+              );
+            },
+            tooltip: 'Clear Brush',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.small(
+            heroTag: 'add_gantt',
+            onPressed: () => _addGanttTool(context),
+            tooltip: 'Add Gantt',
+            backgroundColor: Colors.green[700],
+            child: const Icon(Icons.view_timeline, size: 20),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.small(
+            heroTag: 'clear_gantt',
+            onPressed: () {
+              final count = _ganttTools.length;
+              setState(() => _ganttTools.clear());
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Cleared $count gantt bars')),
+              );
+            },
+            tooltip: 'Clear Gantt',
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.clear, size: 20),
           ),
         ],
       ),
@@ -783,6 +1046,563 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         },
       ),
     ));
+  }
+
+  void _addPosition(BuildContext context) {
+    // Calculate visible price range
+    final visibleData = _data.length > 90 ? _data.sublist(_data.length - 90) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create a sample position (Long)
+    final entryPrice = minVisiblePrice + (priceRange * 0.5); // Middle
+    final stopLossPrice = minVisiblePrice + (priceRange * 0.35); // Below entry
+    final takeProfitPrice = minVisiblePrice + (priceRange * 0.8); // Above entry
+    
+    final positionId = 'position_${DateTime.now().millisecondsSinceEpoch}';
+    
+    final position = PositionTool(
+      id: positionId,
+      entryPrice: entryPrice,
+      stopLossPrice: stopLossPrice,
+      takeProfitPrice: takeProfitPrice,
+      options: PositionToolOptions(
+        showLabels: true,
+        showPriceInLabel: true,
+        showRiskReward: true,
+        showPositionZone: true,
+        draggable: true,
+        onPositionChanged: (entry, sl, tp) {
+          setState(() {
+            final index = _positionTools.indexWhere((p) => p.id == positionId);
+            if (index >= 0) {
+              _positionTools[index] = _positionTools[index].copyWith(
+                entryPrice: entry,
+                stopLossPrice: sl,
+                takeProfitPrice: tp,
+              );
+            }
+          });
+        },
+      ),
+    );
+    
+    setState(() {
+      _positionTools.add(position);
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Position added! Drag lines to adjust.')),
+    );
+  }
+
+  void _addRuler(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create ruler from 30% to 70% of visible range (40% width)
+    final startIndex = (_data.length - visibleCount) + (visibleCount * 0.3).toInt();
+    final endIndex = (_data.length - visibleCount) + (visibleCount * 0.7).toInt();
+    
+    final startTime = _data[startIndex.clamp(0, _data.length - 1)].timestamp;
+    final endTime = _data[endIndex.clamp(0, _data.length - 1)].timestamp;
+    
+    final startPrice = minVisiblePrice + (priceRange * 0.4);
+    final endPrice = minVisiblePrice + (priceRange * 0.7);
+    
+    final rulerId = 'ruler_${DateTime.now().millisecondsSinceEpoch}';
+    
+    final ruler = RulerTool(
+      id: rulerId,
+      startTime: startTime,
+      startPrice: startPrice,
+      endTime: endTime,
+      endPrice: endPrice,
+      options: RulerToolOptions(
+        showPrice: true,
+        showPercentage: true,
+        showPips: false,
+        showTime: true,
+        draggable: true,
+        onMoved: (newStartTime, newStartPrice, newEndTime, newEndPrice) {
+          setState(() {
+            final index = _rulerTools.indexWhere((r) => r.id == rulerId);
+            if (index >= 0) {
+              _rulerTools[index] = _rulerTools[index].copyWith(
+                startTime: newStartTime,
+                startPrice: newStartPrice,
+                endTime: newEndTime,
+                endPrice: newEndPrice,
+              );
+            }
+          });
+        },
+      ),
+    );
+    
+    setState(() {
+      _rulerTools.add(ruler);
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ruler added! Shows price, %, and time.')),
+    );
+  }
+
+  void _addVerticalLine(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    
+    // Place vertical line at 50% of visible range
+    final targetIndex = (_data.length - visibleCount) + (visibleCount * 0.5).toInt();
+    final timestamp = _data[targetIndex.clamp(0, _data.length - 1)].timestamp;
+    
+    final vlineId = 'vline_${DateTime.now().millisecondsSinceEpoch}';
+    
+    final vline = VerticalLine(
+      id: vlineId,
+      timestamp: timestamp,
+      options: VerticalLineOptions(
+        label: 'Event',
+        showLabel: true,
+        draggable: true,
+        onMoved: (newTimestamp) {
+          setState(() {
+            final index = _verticalLines.indexWhere((v) => v.id == vlineId);
+            if (index >= 0) {
+              _verticalLines[index] = _verticalLines[index].copyWith(
+                timestamp: newTimestamp,
+              );
+            }
+          });
+        },
+      ),
+    );
+    
+    setState(() {
+      _verticalLines.add(vline);
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Vertical line added! Mark temporal events.')),
+    );
+  }
+
+  void _addFibonacciExtension(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create 3 points: A (low), B (high), C (retracement)
+    // Point A at 20% of visible range
+    final indexA = (_data.length - visibleCount) + (visibleCount * 0.2).toInt();
+    final pointATime = _data[indexA.clamp(0, _data.length - 1)].timestamp;
+    final pointAPrice = minVisiblePrice + (priceRange * 0.3);
+    
+    // Point B at 50% of visible range
+    final indexB = (_data.length - visibleCount) + (visibleCount * 0.5).toInt();
+    final pointBTime = _data[indexB.clamp(0, _data.length - 1)].timestamp;
+    final pointBPrice = minVisiblePrice + (priceRange * 0.7);
+    
+    // Point C at 70% of visible range
+    final indexC = (_data.length - visibleCount) + (visibleCount * 0.7).toInt();
+    final pointCTime = _data[indexC.clamp(0, _data.length - 1)].timestamp;
+    final pointCPrice = minVisiblePrice + (priceRange * 0.5);
+    
+    final fibExtId = 'fib_ext_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _fibonacciExtensions.add(FibonacciExtension(
+        id: fibExtId,
+        pointAPrice: pointAPrice,
+        pointATime: pointATime,
+        pointBPrice: pointBPrice,
+        pointBTime: pointBTime,
+        pointCPrice: pointCPrice,
+        pointCTime: pointCTime,
+        options: FibonacciExtensionOptions(
+          draggable: true,
+          showLabels: true,
+          onMoved: (newATime, newAPrice, newBTime, newBPrice, newCTime, newCPrice) {
+            setState(() {
+              final index = _fibonacciExtensions.indexWhere((f) => f.id == fibExtId);
+              if (index >= 0) {
+                final current = _fibonacciExtensions[index];
+                _fibonacciExtensions[index] = FibonacciExtension(
+                  id: current.id,
+                  pointATime: newATime,
+                  pointAPrice: newAPrice,
+                  pointBTime: newBTime,
+                  pointBPrice: newBPrice,
+                  pointCTime: newCTime,
+                  pointCPrice: newCPrice,
+                  style: current.style,
+                  options: current.options,
+                );
+              }
+            });
+          },
+        ),
+      ));
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fibonacci Extension added! Shows projection levels.')),
+    );
+  }
+
+  void _addFibonacciFan(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create 2 points: Start (pivot) and End (defines trend)
+    // Start point at 30% of visible range
+    final startIndex = (_data.length - visibleCount) + (visibleCount * 0.3).toInt();
+    final startTime = _data[startIndex.clamp(0, _data.length - 1)].timestamp;
+    final startPrice = minVisiblePrice + (priceRange * 0.3);
+    
+    // End point at 70% of visible range
+    final endIndex = (_data.length - visibleCount) + (visibleCount * 0.7).toInt();
+    final endTime = _data[endIndex.clamp(0, _data.length - 1)].timestamp;
+    final endPrice = minVisiblePrice + (priceRange * 0.7);
+    
+    final fibFanId = 'fib_fan_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _fibonacciFans.add(FibonacciFan(
+        id: fibFanId,
+        startPrice: startPrice,
+        startTime: startTime,
+        endPrice: endPrice,
+        endTime: endTime,
+        options: FibonacciFanOptions(
+          draggable: true,
+          showLabels: true,
+          onMoved: (newStartTime, newStartPrice, newEndTime, newEndPrice) {
+            setState(() {
+              final index = _fibonacciFans.indexWhere((f) => f.id == fibFanId);
+              if (index >= 0) {
+                final current = _fibonacciFans[index];
+                _fibonacciFans[index] = FibonacciFan(
+                  id: current.id,
+                  startTime: newStartTime,
+                  startPrice: newStartPrice,
+                  endTime: newEndTime,
+                  endPrice: newEndPrice,
+                  style: current.style,
+                  options: current.options,
+                );
+              }
+            });
+          },
+        ),
+      ));
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fibonacci Fan added! Shows radial trend lines.')),
+    );
+  }
+
+  void _addArrowTool(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create arrow from 30% to 70% of visible range
+    final startIndex = (_data.length - visibleCount) + (visibleCount * 0.3).toInt();
+    final startTime = _data[startIndex.clamp(0, _data.length - 1)].timestamp;
+    final startPrice = minVisiblePrice + (priceRange * 0.4);
+    
+    final endIndex = (_data.length - visibleCount) + (visibleCount * 0.7).toInt();
+    final endTime = _data[endIndex.clamp(0, _data.length - 1)].timestamp;
+    final endPrice = minVisiblePrice + (priceRange * 0.6);
+    
+    final arrowId = 'arrow_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _arrowTools.add(ArrowTool(
+        id: arrowId,
+        startTime: startTime,
+        startPrice: startPrice,
+        endTime: endTime,
+        endPrice: endPrice,
+        options: ArrowToolOptions(
+          draggable: true,
+          onMoved: (newStartTime, newStartPrice, newEndTime, newEndPrice) {
+            setState(() {
+              final index = _arrowTools.indexWhere((a) => a.id == arrowId);
+              if (index >= 0) {
+                final current = _arrowTools[index];
+                _arrowTools[index] = ArrowTool(
+                  id: current.id,
+                  startTime: newStartTime,
+                  startPrice: newStartPrice,
+                  endTime: newEndTime,
+                  endPrice: newEndPrice,
+                  style: current.style,
+                  options: current.options,
+                );
+              }
+            });
+          },
+        ),
+      ));
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Arrow added! Draw directional annotations.')),
+    );
+  }
+
+  void _addCircleTool(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create circle at center of visible range
+    final centerIndex = (_data.length - visibleCount) + (visibleCount * 0.5).toInt();
+    final centerTime = _data[centerIndex.clamp(0, _data.length - 1)].timestamp;
+    final centerPrice = minVisiblePrice + (priceRange * 0.5);
+    
+    // Radius: 10 candles in time, 15% of price range
+    final radiusTime = 10 * 86400000; // 10 days in milliseconds
+    final radiusPrice = priceRange * 0.15;
+    
+    final circleId = 'circle_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _circleTools.add(CircleTool(
+        id: circleId,
+        centerTime: centerTime,
+        centerPrice: centerPrice,
+        radiusTime: radiusTime,
+        radiusPrice: radiusPrice,
+        style: const CircleToolStyle(
+          filled: true,
+          fillOpacity: 0.1,
+        ),
+        options: CircleToolOptions(
+          draggable: true,
+          onMoved: (newCenterTime, newCenterPrice, newRadiusTime, newRadiusPrice) {
+            setState(() {
+              final index = _circleTools.indexWhere((c) => c.id == circleId);
+              if (index >= 0) {
+                final current = _circleTools[index];
+                _circleTools[index] = CircleTool(
+                  id: current.id,
+                  centerTime: newCenterTime,
+                  centerPrice: newCenterPrice,
+                  radiusTime: newRadiusTime,
+                  radiusPrice: newRadiusPrice,
+                  style: current.style,
+                  options: current.options,
+                );
+              }
+            });
+          },
+        ),
+      ));
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Circle added! Highlight areas of interest.')),
+    );
+  }
+
+  void _addTextTool(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create text at center of visible range
+    final centerIndex = (_data.length - visibleCount) + (visibleCount * 0.5).toInt();
+    final timestamp = _data[centerIndex.clamp(0, _data.length - 1)].timestamp;
+    final price = minVisiblePrice + (priceRange * 0.5);
+    
+    final textId = 'text_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _textTools.add(TextTool(
+        id: textId,
+        timestamp: timestamp,
+        price: price,
+        text: 'Note ${_textTools.length + 1}',
+        options: TextToolOptions(
+          draggable: true,
+          onMoved: (newTimestamp, newPrice) {
+            setState(() {
+              final index = _textTools.indexWhere((t) => t.id == textId);
+              if (index >= 0) {
+                _textTools[index] = _textTools[index].copyWith(
+                  timestamp: newTimestamp,
+                  price: newPrice,
+                );
+              }
+            });
+          },
+          onEdit: (currentText) async {
+            // Show dialog to edit text
+            final controller = TextEditingController(text: currentText);
+            final newText = await showDialog<String>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Edit Text'),
+                content: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter text...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  onSubmitted: (value) => Navigator.of(context).pop(value),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(controller.text),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            );
+            
+            if (newText != null && newText.isNotEmpty) {
+              setState(() {
+                final index = _textTools.indexWhere((t) => t.id == textId);
+                if (index >= 0) {
+                  _textTools[index] = _textTools[index].copyWith(text: newText);
+                }
+              });
+            }
+            
+            return newText;
+          },
+        ),
+      ));
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Text annotation added! Drag to move, double-tap to edit.'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _addBrushTool(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Brush Tool: The current implementation shows a sample stroke. Interactive drawing would require gesture capture during drag, which is a more advanced feature. For now, you can see how brush strokes are rendered.'),
+        duration: Duration(seconds: 5),
+      ),
+    );
+    
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create a sample brush stroke with multiple points to show smooth curve
+    final points = <BrushPoint>[];
+    for (int i = 0; i < 10; i++) {
+      final index = (_data.length - visibleCount) + (visibleCount * (0.2 + i * 0.06)).toInt();
+      final timestamp = _data[index.clamp(0, _data.length - 1)].timestamp;
+      // Create a wave pattern
+      final wave = math.sin(i * 0.5) * 0.1;
+      final price = minVisiblePrice + (priceRange * (0.5 + wave));
+      points.add(BrushPoint(timestamp: timestamp, price: price));
+    }
+    
+    final brushId = 'brush_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _brushTools.add(BrushTool(
+        id: brushId,
+        points: points,
+        options: BrushToolOptions(
+          draggable: false, // Brush strokes are typically not draggable
+        ),
+      ));
+    });
+  }
+
+  void _addGanttTool(BuildContext context) {
+    // Calculate visible data range
+    final visibleCount = 90;
+    final visibleData = _data.length > visibleCount ? _data.sublist(_data.length - visibleCount) : _data;
+    final minVisiblePrice = visibleData.map((c) => c.low ?? 0).reduce((a, b) => a < b ? a : b);
+    final maxVisiblePrice = visibleData.map((c) => c.high ?? 0).reduce((a, b) => a > b ? a : b);
+    final priceRange = maxVisiblePrice - minVisiblePrice;
+    
+    // Create gantt bar from 30% to 70% of visible range
+    final startIndex = (_data.length - visibleCount) + (visibleCount * 0.3).toInt();
+    final startTime = _data[startIndex.clamp(0, _data.length - 1)].timestamp;
+    
+    final endIndex = (_data.length - visibleCount) + (visibleCount * 0.7).toInt();
+    final endTime = _data[endIndex.clamp(0, _data.length - 1)].timestamp;
+    
+    final price = minVisiblePrice + (priceRange * 0.6);
+    final height = priceRange * 0.1;
+    
+    final ganttId = 'gantt_${DateTime.now().millisecondsSinceEpoch}';
+    
+    setState(() {
+      _ganttTools.add(GanttTool(
+        id: ganttId,
+        startTime: startTime,
+        endTime: endTime,
+        price: price,
+        height: height,
+        label: 'Period ${_ganttTools.length + 1}',
+        options: GanttToolOptions(
+          draggable: true,
+          onMoved: (newStartTime, newEndTime, newPrice) {
+            setState(() {
+              final index = _ganttTools.indexWhere((g) => g.id == ganttId);
+              if (index >= 0) {
+                _ganttTools[index] = _ganttTools[index].copyWith(
+                  startTime: newStartTime,
+                  endTime: newEndTime,
+                  price: newPrice,
+                );
+              }
+            });
+          },
+        ),
+      ));
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Gantt bar added! Visualize time periods.')),
+    );
   }
 
   // ============================================================================

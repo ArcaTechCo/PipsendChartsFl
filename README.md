@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-Dual%20License-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-%E2%89%A5%202.0.0-02569B?logo=flutter)](https://flutter.dev)
-[![Pub Version](https://img.shields.io/badge/pub-v1.0.7-blue)](https://pub.dev)
+[![Pub Version](https://img.shields.io/badge/pub-v1.1.7-blue)](https://pub.dev)
 
 *A powerful, feature-rich charting library for Flutter with 12+ technical indicators, interactive overlays, and professional trading tools.*
 
@@ -67,25 +67,33 @@
 - **Volume Bars** - Integrated volume display
 - **Responsive** - Works on mobile, web, and desktop
 
-### 📊 Technical Indicators (12+)
-- **Moving Averages** - SMA(20, 50), EMA(12, 26)
+### 📊 Technical Indicators (12)
+- **Moving Averages** - SMA, EMA, WMA with customizable periods
 - **RSI** - Relative Strength Index with overbought/oversold zones
 - **MACD** - Moving Average Convergence Divergence with histogram
 - **Bollinger Bands** - Volatility bands with customizable periods
 - **Stochastic** - %K and %D lines with signal zones
 - **ATR** - Average True Range for volatility
-- **ADX** - Average Directional Index for trend strength
-- **CCI** - Commodity Channel Index
-- **Williams %R** - Momentum indicator
 - **OBV** - On-Balance Volume
-- **Volume** - Dedicated volume indicator
+- **Volume Profile** - Distribution of volume by price level
+- **Trading Sessions** - Highlight Asian, European, and American sessions
 
-### 🎯 Trading Tools
+### 🎯 Drawing Tools (14)
 - **Trading Lines** - Entry, Stop Loss, Take Profit, Support, Resistance
-- **Price Zones** - Demand, Supply, Support, Resistance zones
-- **Fibonacci Retracement** - Standard Fib levels with draggable points
-- **Trend Lines** - Diagonal lines with angle display
-- **All Draggable** - Interactive repositioning with callbacks
+- **Price Zones** - Demand, Supply, Support, Resistance zones with drag & resize
+- **Fibonacci Retracement** - Standard Fib levels with draggable handles
+- **Fibonacci Extension** - 3-point projection with independent drag
+- **Fibonacci Fan** - Radial Fibonacci lines from pivot point
+- **Trend Lines** - Diagonal lines with angle display and extension
+- **Position Tool** - Visualize trades with Entry, SL, and TP lines
+- **Ruler Tool** - Measure price/time distance with statistics
+- **Vertical Line** - Mark temporal events on the chart
+- **Arrow Tool** - Directional arrows for annotations
+- **Circle Tool** - Highlight areas with resizable circles
+- **Text Tool** - Add text annotations (double-tap to edit)
+- **Brush Tool** - Freehand drawing visualization
+- **Gantt Tool** - Time period bars with labels
+- **All Interactive** - Full drag & drop with real-time preview
 
 ### 🔧 Management System
 - **TradingLineManager** - Manage multiple trading lines
@@ -103,7 +111,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  pipsend_charts: ^1.0.7
+  pipsend_charts: ^1.1.7
 ```
 
 Then run:
