@@ -57,15 +57,12 @@ class ArrowTool extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
     
-    // Find indices for the two points
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return;
-    
-    final x1 = startIndex * params.candleWidth;
+    // Find screen coordinates for the two points
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return;
+
     final y1 = params.fitPrice(startPrice);
-    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     // Draw background highlight when being dragged
@@ -156,15 +153,12 @@ class ArrowTool extends ChartOverlay {
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
     
-    // Find indices for the two points
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return false;
-    
-    final x1 = startIndex * params.candleWidth;
+    // Find screen coordinates for the two points
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return false;
+
     final y1 = params.fitPrice(startPrice);
-    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     // Test if touching the line
@@ -191,10 +185,9 @@ class ArrowTool extends ChartOverlay {
   bool hitTestStartHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    if (startIndex < 0) return false;
-    
-    final x = startIndex * params.candleWidth;
+    final x = params.fitTimestamp(startTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(startPrice);
     
     const handleSize = 20.0;
@@ -205,10 +198,9 @@ class ArrowTool extends ChartOverlay {
   bool hitTestEndHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    if (endIndex < 0) return false;
-    
-    final x = endIndex * params.candleWidth;
+    final x = params.fitTimestamp(endTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(endPrice);
     
     const handleSize = 20.0;
@@ -231,6 +223,48 @@ class ArrowTool extends ChartOverlay {
       style: style,
       options: options,
       visible: visible,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startTime': startTime,
+    'startPrice': startPrice,
+    'endTime': endTime,
+    'endPrice': endPrice,
+    'style': {
+      'color': style.color.value,
+      'strokeWidth': style.strokeWidth,
+      'arrowheadSize': style.arrowheadSize,
+      'arrowheadAngle': style.arrowheadAngle,
+      'fillArrowhead': style.fillArrowhead,
+    },
+    'options': {
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory ArrowTool.fromJson(Map<String, dynamic> json) {
+    final s = json['style'] as Map<String, dynamic>?;
+    final o = json['options'] as Map<String, dynamic>?;
+    return ArrowTool(
+      id: json['id'] as String?,
+      startTime: json['startTime'] as int,
+      startPrice: (json['startPrice'] as num).toDouble(),
+      endTime: json['endTime'] as int,
+      endPrice: (json['endPrice'] as num).toDouble(),
+      style: s != null ? ArrowToolStyle(
+        color: Color(s['color'] as int),
+        strokeWidth: (s['strokeWidth'] as num?)?.toDouble() ?? 2.0,
+        arrowheadSize: (s['arrowheadSize'] as num?)?.toDouble() ?? 12.0,
+        arrowheadAngle: (s['arrowheadAngle'] as num?)?.toDouble() ?? 30.0,
+        fillArrowhead: s['fillArrowhead'] as bool? ?? true,
+      ) : null,
+      options: o != null ? ArrowToolOptions(
+        draggable: o['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
     );
   }
 

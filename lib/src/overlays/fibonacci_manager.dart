@@ -117,8 +117,13 @@ class FibonacciManager {
   /// Updates the price range of a Fibonacci retracement.
   ///
   /// Returns true if the Fibonacci was found and updated.
-  bool updateFibonacciRange(String id, double newHighPrice, double newLowPrice) {
-    return updateFibonacci(id, (fib) => fib.withPrices(newHighPrice, newLowPrice));
+  bool updateFibonacciRange(String id, double newHighPrice, double newLowPrice, {int? startTime, int? endTime}) {
+    return updateFibonacci(id, (fib) => fib.copyWith(
+      highPrice: newHighPrice,
+      lowPrice: newLowPrice,
+      startTime: startTime ?? fib.startTime,
+      endTime: endTime ?? fib.endTime,
+    ));
   }
 
   /// Sets the visibility of a Fibonacci retracement.
@@ -244,9 +249,23 @@ class FibonacciManager {
     _fibonaccis.sort((a, b) {
       final rangeA = a.highPrice - a.lowPrice;
       final rangeB = b.highPrice - b.lowPrice;
-      return ascending 
+      return ascending
           ? rangeA.compareTo(rangeB)
           : rangeB.compareTo(rangeA);
     });
+  }
+
+  /// Serializes all managed Fibonacci retracements to a JSON-safe list.
+  List<Map<String, dynamic>> serializeAll() {
+    return _fibonaccis.map((fib) => fib.toJson()).toList();
+  }
+
+  /// Removes all Fibonacci retracements and restores from serialized data.
+  void restoreAll(List<Map<String, dynamic>> data) {
+    _fibonaccis.clear();
+    for (final json in data) {
+      _fibonaccis.add(FibonacciRetracement.fromJson(json));
+    }
+    _notifyListeners(FibonacciEvent.cleared());
   }
 }

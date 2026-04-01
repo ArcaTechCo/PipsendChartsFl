@@ -29,6 +29,18 @@ class FibonacciExtensionOptions {
     this.onDelete,
   });
 
+  Map<String, dynamic> toJson() => {
+    'draggable': draggable,
+    'showLabels': showLabels,
+  };
+
+  factory FibonacciExtensionOptions.fromJson(Map<String, dynamic> json) {
+    return FibonacciExtensionOptions(
+      draggable: json['draggable'] as bool? ?? true,
+      showLabels: json['showLabels'] as bool? ?? true,
+    );
+  }
+
   FibonacciExtensionOptions copyWith({
     bool? draggable,
     bool? showLabels,

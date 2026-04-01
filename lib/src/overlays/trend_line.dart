@@ -54,14 +54,11 @@ class TrendLine extends ChartOverlay {
   
   /// Calculates the visual angle based on screen coordinates.
   double calculateVisualAngle(PainterParams params) {
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return 0.0;
-    
-    final x1 = startIndex * params.candleWidth;
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return 0.0;
+
     final y1 = params.fitPrice(startPrice);
-    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     final dx = x2 - x1;
@@ -259,14 +256,11 @@ class TrendLine extends ChartOverlay {
     if (!interactive) return false;
     
     // Find the line segment in screen coordinates
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return false;
-    
-    final x1 = startIndex * params.candleWidth;
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return false;
+
     final y1 = params.fitPrice(startPrice);
-    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     // Calculate distance from point to line segment
@@ -280,10 +274,9 @@ class TrendLine extends ChartOverlay {
   bool hitTestStartHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    if (startIndex < 0) return false;
-    
-    final x = startIndex * params.candleWidth;
+    final x = params.fitTimestamp(startTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(startPrice);
     
     final handleSize = 20.0; // Larger touch area
@@ -297,10 +290,9 @@ class TrendLine extends ChartOverlay {
   bool hitTestEndHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    if (endIndex < 0) return false;
-    
-    final x = endIndex * params.candleWidth;
+    final x = params.fitTimestamp(endTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(endPrice);
     
     final handleSize = 20.0; // Larger touch area
@@ -339,6 +331,34 @@ class TrendLine extends ChartOverlay {
       style: style,
       options: options,
       visible: visible,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startTime': startTime,
+    'startPrice': startPrice,
+    'endTime': endTime,
+    'endPrice': endPrice,
+    'style': style.toJson(),
+    'options': options.toJson(),
+    'visible': visible,
+  };
+
+  factory TrendLine.fromJson(Map<String, dynamic> json) {
+    return TrendLine(
+      id: json['id'] as String?,
+      startTime: json['startTime'] as int,
+      startPrice: (json['startPrice'] as num).toDouble(),
+      endTime: json['endTime'] as int,
+      endPrice: (json['endPrice'] as num).toDouble(),
+      style: json['style'] != null
+          ? TrendLineStyle.fromJson(json['style'] as Map<String, dynamic>)
+          : null,
+      options: json['options'] != null
+          ? TrendLineOptions.fromJson(json['options'] as Map<String, dynamic>)
+          : null,
+      visible: json['visible'] as bool? ?? true,
     );
   }
 

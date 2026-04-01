@@ -30,6 +30,22 @@ class TrendLineOptions {
     this.onDelete,
   });
 
+  Map<String, dynamic> toJson() => {
+    'draggable': draggable,
+    'extendRight': extendRight,
+    'extendLeft': extendLeft,
+    'showAngle': showAngle,
+  };
+
+  factory TrendLineOptions.fromJson(Map<String, dynamic> json) {
+    return TrendLineOptions(
+      draggable: json['draggable'] as bool? ?? true,
+      extendRight: json['extendRight'] as bool? ?? false,
+      extendLeft: json['extendLeft'] as bool? ?? false,
+      showAngle: json['showAngle'] as bool? ?? false,
+    );
+  }
+
   TrendLineOptions copyWith({
     bool? draggable,
     bool? extendRight,

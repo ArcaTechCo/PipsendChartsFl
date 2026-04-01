@@ -67,15 +67,12 @@ class FibonacciFan extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
     
-    // Find indices for the two points
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return;
-    
-    final x1 = startIndex * params.candleWidth;
+    // Find screen coordinates for the two points
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return;
+
     final y1 = params.fitPrice(startPrice);
-    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     // Draw background highlight when being dragged
@@ -273,14 +270,11 @@ class FibonacciFan extends ChartOverlay {
     if (!interactive) return false;
     
     // Test if touching any of the fan lines
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return false;
-    
-    final x1 = startIndex * params.candleWidth;
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return false;
+
     final y1 = params.fitPrice(startPrice);
-    final x2 = endIndex * params.candleWidth;
     final y2 = params.fitPrice(endPrice);
     
     // Calculate the base angle
@@ -328,10 +322,9 @@ class FibonacciFan extends ChartOverlay {
   bool hitTestStartPoint(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    if (startIndex < 0) return false;
-    
-    final x = startIndex * params.candleWidth;
+    final x = params.fitTimestamp(startTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(startPrice);
     
     const handleSize = 20.0;
@@ -342,14 +335,41 @@ class FibonacciFan extends ChartOverlay {
   bool hitTestEndPoint(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    if (endIndex < 0) return false;
-    
-    final x = endIndex * params.candleWidth;
+    final x = params.fitTimestamp(endTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(endPrice);
     
     const handleSize = 20.0;
     return (position - Offset(x, y)).distance < handleSize;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startPrice': startPrice,
+    'startTime': startTime,
+    'endPrice': endPrice,
+    'endTime': endTime,
+    'style': style.toJson(),
+    'options': options.toJson(),
+    'visible': visible,
+  };
+
+  factory FibonacciFan.fromJson(Map<String, dynamic> json) {
+    return FibonacciFan(
+      id: json['id'] as String?,
+      startPrice: (json['startPrice'] as num).toDouble(),
+      startTime: json['startTime'] as int,
+      endPrice: (json['endPrice'] as num).toDouble(),
+      endTime: json['endTime'] as int,
+      style: json['style'] != null
+          ? FibonacciStyle.fromJson(json['style'] as Map<String, dynamic>)
+          : null,
+      options: json['options'] != null
+          ? FibonacciFanOptions.fromJson(json['options'] as Map<String, dynamic>)
+          : null,
+      visible: json['visible'] as bool? ?? true,
+    );
   }
 
   /// Creates a copy with updated points.

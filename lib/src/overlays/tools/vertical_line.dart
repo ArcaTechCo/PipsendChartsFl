@@ -51,11 +51,9 @@ class VerticalLine extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
 
-    // Find the candle index for this timestamp
-    final candleIndex = params.candles.indexWhere((c) => c.timestamp >= timestamp);
-    if (candleIndex < 0) return;
-
-    final x = candleIndex * params.candleWidth;
+    // Find screen X coordinate for this timestamp
+    final x = params.fitTimestamp(timestamp);
+    if (x == null) return;
 
     // Draw the line
     _drawLine(canvas, x, params, isBeingDragged: isBeingDragged);
@@ -192,15 +190,58 @@ class VerticalLine extends ChartOverlay {
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
 
-    // Find the candle index for this timestamp
-    final candleIndex = params.candles.indexWhere((c) => c.timestamp >= timestamp);
-    if (candleIndex < 0) return false;
-
-    final x = candleIndex * params.candleWidth;
+    // Find screen X coordinate for this timestamp
+    final x = params.fitTimestamp(timestamp);
+    if (x == null) return false;
 
     // Increased tolerance for easier touch
     const hitTolerance = 12.0;
     return (position.dx - x).abs() < hitTolerance;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'timestamp': timestamp,
+    'style': {
+      'lineColor': style.lineColor.value,
+      'lineWidth': style.lineWidth,
+      if (style.dashPattern != null) 'dashPattern': style.dashPattern,
+      'labelTextColor': style.labelTextColor.value,
+      'labelBackgroundColor': style.labelBackgroundColor.value,
+    },
+    'options': {
+      if (options.label != null) 'label': options.label,
+      'showLabel': options.showLabel,
+      'labelPosition': options.labelPosition.name,
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory VerticalLine.fromJson(Map<String, dynamic> json) {
+    final styleJson = json['style'] as Map<String, dynamic>?;
+    final optionsJson = json['options'] as Map<String, dynamic>?;
+    return VerticalLine(
+      id: json['id'] as String?,
+      timestamp: json['timestamp'] as int,
+      style: styleJson != null ? VerticalLineStyle(
+        lineColor: Color(styleJson['lineColor'] as int),
+        lineWidth: (styleJson['lineWidth'] as num?)?.toDouble() ?? 2.0,
+        dashPattern: (styleJson['dashPattern'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList(),
+        labelTextColor: styleJson['labelTextColor'] != null ? Color(styleJson['labelTextColor'] as int) : const Color(0xFFFFFFFF),
+        labelBackgroundColor: styleJson['labelBackgroundColor'] != null ? Color(styleJson['labelBackgroundColor'] as int) : const Color(0xCC9C27B0),
+      ) : null,
+      options: optionsJson != null ? VerticalLineOptions(
+        label: optionsJson['label'] as String?,
+        showLabel: optionsJson['showLabel'] as bool? ?? true,
+        labelPosition: VerticalLineLabelPosition.values.firstWhere(
+          (e) => e.name == optionsJson['labelPosition'],
+          orElse: () => VerticalLineLabelPosition.top,
+        ),
+        draggable: optionsJson['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
+    );
   }
 
   /// Creates a copy with updated timestamp.

@@ -290,9 +290,23 @@ class TrendLineManager {
     _trendLines.sort((a, b) {
       final durationA = a.endTime - a.startTime;
       final durationB = b.endTime - b.startTime;
-      return ascending 
+      return ascending
           ? durationA.compareTo(durationB)
           : durationB.compareTo(durationA);
     });
+  }
+
+  /// Serializes all managed trend lines to a JSON-safe list.
+  List<Map<String, dynamic>> serializeAll() {
+    return _trendLines.map((line) => line.toJson()).toList();
+  }
+
+  /// Removes all trend lines and restores from serialized data.
+  void restoreAll(List<Map<String, dynamic>> data) {
+    _trendLines.clear();
+    for (final json in data) {
+      _trendLines.add(TrendLine.fromJson(json));
+    }
+    _notifyListeners(TrendLineEvent.cleared());
   }
 }

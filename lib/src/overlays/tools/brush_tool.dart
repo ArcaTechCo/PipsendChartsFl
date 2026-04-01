@@ -58,14 +58,13 @@ class BrushTool extends ChartOverlay {
     // Convert points to screen coordinates
     final screenPoints = <Offset>[];
     for (final point in points) {
-      final index = params.candles.indexWhere((c) => c.timestamp >= point.timestamp);
-      if (index >= 0) {
-        final x = index * params.candleWidth;
+      final x = params.fitTimestamp(point.timestamp);
+      if (x != null) {
         final y = params.fitPrice(point.price);
         screenPoints.add(Offset(x, y));
       }
     }
-    
+
     if (screenPoints.isEmpty) return;
     
     // Draw the path
@@ -139,14 +138,13 @@ class BrushTool extends ChartOverlay {
     // Convert points to screen coordinates
     final screenPoints = <Offset>[];
     for (final point in points) {
-      final index = params.candles.indexWhere((c) => c.timestamp >= point.timestamp);
-      if (index >= 0) {
-        final x = index * params.candleWidth;
+      final x = params.fitTimestamp(point.timestamp);
+      if (x != null) {
         final y = params.fitPrice(point.price);
         screenPoints.add(Offset(x, y));
       }
     }
-    
+
     if (screenPoints.isEmpty) return false;
     
     // Test if touching any segment of the path
@@ -178,6 +176,38 @@ class BrushTool extends ChartOverlay {
     return (point - projection).distance;
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'points': points.map((p) => p.toJson()).toList(),
+    'style': {
+      'color': style.color.value,
+      'strokeWidth': style.strokeWidth,
+      'smooth': style.smooth,
+    },
+    'options': {
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory BrushTool.fromJson(Map<String, dynamic> json) {
+    final s = json['style'] as Map<String, dynamic>?;
+    final o = json['options'] as Map<String, dynamic>?;
+    return BrushTool(
+      id: json['id'] as String?,
+      points: (json['points'] as List<dynamic>).map((p) => BrushPoint.fromJson(p as Map<String, dynamic>)).toList(),
+      style: s != null ? BrushToolStyle(
+        color: Color(s['color'] as int),
+        strokeWidth: (s['strokeWidth'] as num?)?.toDouble() ?? 2.0,
+        smooth: s['smooth'] as bool? ?? true,
+      ) : null,
+      options: o != null ? BrushToolOptions(
+        draggable: o['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
+    );
+  }
+
   /// Creates a copy with updated properties.
   BrushTool copyWith({
     List<BrushPoint>? points,
@@ -207,6 +237,18 @@ class BrushPoint {
     required this.timestamp,
     required this.price,
   });
+
+  Map<String, dynamic> toJson() => {
+    'timestamp': timestamp,
+    'price': price,
+  };
+
+  factory BrushPoint.fromJson(Map<String, dynamic> json) {
+    return BrushPoint(
+      timestamp: json['timestamp'] as int,
+      price: (json['price'] as num).toDouble(),
+    );
+  }
 
   BrushPoint copyWith({
     int? timestamp,

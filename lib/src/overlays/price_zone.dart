@@ -58,51 +58,38 @@ class PriceZone extends ChartOverlay {
   /// Center price of the zone.
   double get centerPrice => (minPrice + maxPrice) / 2;
   
+  /// Resolves start X coordinate using fitTimestamp or full-width fallback.
+  double _getStartX(PainterParams params) {
+    if (startTime != null) {
+      return params.fitTimestamp(startTime!) ?? 0;
+    }
+    return 0;
+  }
+
+  /// Resolves end X coordinate using fitTimestamp or full-width fallback.
+  double _getEndX(PainterParams params) {
+    if (endTime != null) {
+      return params.fitTimestamp(endTime!) ?? params.chartWidth;
+    }
+    return params.chartWidth;
+  }
+
   @override
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
-    
-    // Calculate X coordinates based on timestamps
-    double startX = 0;
-    double endX = params.chartWidth;
-    
-    if (startTime != null || endTime != null) {
-      final visibleStartTime = params.candles.first.timestamp;
-      final visibleEndTime = params.candles.last.timestamp;
-      
-      // Check if zone is completely outside visible range
-      if (startTime != null && startTime! > visibleEndTime) return;
-      if (endTime != null && endTime! < visibleStartTime) return;
-      
-      if (startTime != null) {
-        final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime!);
-        if (startIndex >= 0) {
-          startX = startIndex * params.candleWidth;
-        }
-      }
-      
-      if (endTime != null) {
-        final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime!);
-        if (endIndex >= 0) {
-          endX = endIndex * params.candleWidth;
-        }
-      }
-      
-      // Clip to visible range
-      startX = startX.clamp(0.0, params.chartWidth);
-      endX = endX.clamp(0.0, params.chartWidth);
-    }
-    
+
+    final startX = _getStartX(params);
+    final endX = _getEndX(params);
     final minY = params.fitPrice(maxPrice); // Y is inverted
     final maxY = params.fitPrice(minPrice);
-    
+
     // Draw filled rectangle
     final rect = Rect.fromLTRB(startX, minY, endX, maxY);
     final fillPaint = Paint()
       ..color = style.fillColor
       ..style = PaintingStyle.fill;
     canvas.drawRect(rect, fillPaint);
-    
+
     // Draw border if enabled
     if (style.showBorder) {
       final borderPaint = Paint()
@@ -111,108 +98,92 @@ class PriceZone extends ChartOverlay {
         ..style = PaintingStyle.stroke;
       canvas.drawRect(rect, borderPaint);
     }
-    
+
     // Draw label if enabled
     if (options.showLabel) {
-      _drawLabel(canvas, minY, maxY, params);
+      _drawLabel(canvas, startX, minY, maxY);
     }
-    
-    // Draw resize handles if resizable (always show when zone is interactive)
+
+    // Draw resize handles: top-left (maxPrice/startTime) and bottom-right (minPrice/endTime)
     if (options.resizable) {
-      _drawResizeHandles(canvas, minY, maxY, params, isBeingDragged);
+      _drawHandle(canvas, startX, minY, isBeingDragged);
+      _drawHandle(canvas, endX, maxY, isBeingDragged);
     }
   }
-  
-  void _drawLabel(Canvas canvas, double minY, double maxY, PainterParams params) {
+
+  void _drawLabel(Canvas canvas, double startX, double minY, double maxY) {
     final label = options.label ?? type.defaultLabel;
     if (label.isEmpty) return;
-    
+
     final textStyle = style.labelStyle ?? const TextStyle(
       color: Color(0xFF9E9E9E),
       fontSize: 11,
       fontWeight: FontWeight.w500,
     );
-    
-    final textSpan = TextSpan(text: label, style: textStyle);
+
     final textPainter = TextPainter(
-      text: textSpan,
+      text: TextSpan(text: label, style: textStyle),
       textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    
-    // Position label at top-left of zone with padding
-    final x = 8.0;
-    final y = minY + 4.0;
-    
-    textPainter.paint(canvas, Offset(x, y));
+    )..layout();
+
+    textPainter.paint(canvas, Offset(startX + 8.0, minY + 4.0));
   }
-  
-  void _drawResizeHandles(Canvas canvas, double minY, double maxY, PainterParams params, bool isBeingDragged) {
-    // Make handles more visible when being dragged
+
+  void _drawHandle(Canvas canvas, double x, double y, bool isBeingDragged) {
     final handleSize = isBeingDragged ? 8.0 : 6.0;
     final opacity = isBeingDragged ? 1.0 : 0.7;
-    
+
     final handlePaint = Paint()
       ..color = style.borderColor.withOpacity(opacity)
       ..style = PaintingStyle.fill;
-    
-    final centerX = params.chartWidth / 2;
-    
-    // Draw handles with white border for better visibility
+
     final borderPaint = Paint()
       ..color = const Color(0xFFFFFFFF).withOpacity(opacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
-    
-    // Top handle
-    canvas.drawCircle(Offset(centerX, minY), handleSize, handlePaint);
-    canvas.drawCircle(Offset(centerX, minY), handleSize, borderPaint);
-    
-    // Bottom handle
-    canvas.drawCircle(Offset(centerX, maxY), handleSize, handlePaint);
-    canvas.drawCircle(Offset(centerX, maxY), handleSize, borderPaint);
+
+    canvas.drawCircle(Offset(x, y), handleSize, handlePaint);
+    canvas.drawCircle(Offset(x, y), handleSize, borderPaint);
   }
-  
+
   @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
-    
+
+    final startX = _getStartX(params);
+    final endX = _getEndX(params);
     final minY = params.fitPrice(maxPrice);
     final maxY = params.fitPrice(minPrice);
-    
-    // Check if position is within the zone
-    return position.dy >= minY && 
-           position.dy <= maxY &&
-           position.dx >= 0 && 
-           position.dx <= params.chartWidth;
+
+    final lx = startX < endX ? startX : endX;
+    final rx = startX > endX ? startX : endX;
+
+    return position.dx >= lx && position.dx <= rx &&
+           position.dy >= minY && position.dy <= maxY;
   }
-  
-  /// Checks if the position is on the top handle (maxPrice).
+
+  /// Checks if the position is on the top-left handle (maxPrice + startTime).
   bool hitTestTopHandle(Offset position, PainterParams params) {
     if (!options.resizable) return false;
-    
-    final minY = params.fitPrice(maxPrice);
-    final handleSize = 20.0; // Larger touch area for easier interaction
-    final centerX = params.chartWidth / 2;
-    
-    final dx = (position.dx - centerX).abs();
-    final dy = (position.dy - minY).abs();
-    
-    return dx <= handleSize && dy <= handleSize;
+
+    final x = _getStartX(params);
+    final y = params.fitPrice(maxPrice);
+    const handleSize = 20.0;
+
+    return (position.dx - x).abs() <= handleSize &&
+           (position.dy - y).abs() <= handleSize;
   }
-  
-  /// Checks if the position is on the bottom handle (minPrice).
+
+  /// Checks if the position is on the bottom-right handle (minPrice + endTime).
   bool hitTestBottomHandle(Offset position, PainterParams params) {
     if (!options.resizable) return false;
-    
-    final maxY = params.fitPrice(minPrice);
-    final handleSize = 20.0; // Larger touch area for easier interaction
-    final centerX = params.chartWidth / 2;
-    
-    final dx = (position.dx - centerX).abs();
-    final dy = (position.dy - maxY).abs();
-    
-    return dx <= handleSize && dy <= handleSize;
+
+    final x = _getEndX(params);
+    final y = params.fitPrice(minPrice);
+    const handleSize = 20.0;
+
+    return (position.dx - x).abs() <= handleSize &&
+           (position.dy - y).abs() <= handleSize;
   }
   
   /// Creates a copy with a new price range.
@@ -255,5 +226,38 @@ class PriceZone extends ChartOverlay {
     );
   }
   
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'minPrice': minPrice,
+    'maxPrice': maxPrice,
+    'type': type.name,
+    'style': style.toJson(),
+    'options': options.toJson(),
+    'visible': visible,
+    if (startTime != null) 'startTime': startTime,
+    if (endTime != null) 'endTime': endTime,
+  };
+
+  factory PriceZone.fromJson(Map<String, dynamic> json) {
+    return PriceZone(
+      id: json['id'] as String?,
+      minPrice: (json['minPrice'] as num).toDouble(),
+      maxPrice: (json['maxPrice'] as num).toDouble(),
+      type: PriceZoneType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => PriceZoneType.custom,
+      ),
+      style: json['style'] != null
+          ? PriceZoneStyle.fromJson(json['style'] as Map<String, dynamic>)
+          : null,
+      options: json['options'] != null
+          ? PriceZoneOptions.fromJson(json['options'] as Map<String, dynamic>)
+          : null,
+      visible: json['visible'] as bool? ?? true,
+      startTime: json['startTime'] as int?,
+      endTime: json['endTime'] as int?,
+    );
+  }
+
   String toDebugString() => 'PriceZone(id: $id, type: $type, range: $minPrice-$maxPrice)';
 }

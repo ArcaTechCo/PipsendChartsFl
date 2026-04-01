@@ -123,4 +123,39 @@ class TradingLineOptions {
       onDelete: onDelete ?? this.onDelete,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'showLabel': showLabel,
+    'showPrice': showPrice,
+    if (title != null) 'title': title,
+    if (customText != null) 'customText': customText,
+    if (customTextColor != null) 'customTextColor': customTextColor!.value,
+    if (customTextFontSize != null) 'customTextFontSize': customTextFontSize,
+    if (customTextBackgroundColor != null) 'customTextBackgroundColor': customTextBackgroundColor!.value,
+    'labelPosition': labelPosition.name,
+    if (customLabelOffset != null) 'customLabelOffset': {'dx': customLabelOffset!.dx, 'dy': customLabelOffset!.dy},
+    'draggable': draggable,
+    'deletable': deletable,
+  };
+
+  factory TradingLineOptions.fromJson(Map<String, dynamic> json) {
+    return TradingLineOptions(
+      showLabel: json['showLabel'] as bool? ?? true,
+      showPrice: json['showPrice'] as bool? ?? true,
+      title: json['title'] as String?,
+      customText: json['customText'] as String?,
+      customTextColor: json['customTextColor'] != null ? Color(json['customTextColor'] as int) : null,
+      customTextFontSize: (json['customTextFontSize'] as num?)?.toDouble(),
+      customTextBackgroundColor: json['customTextBackgroundColor'] != null ? Color(json['customTextBackgroundColor'] as int) : null,
+      labelPosition: LabelPosition.values.firstWhere(
+        (e) => e.name == json['labelPosition'],
+        orElse: () => LabelPosition.left,
+      ),
+      customLabelOffset: json['customLabelOffset'] != null
+          ? Offset((json['customLabelOffset']['dx'] as num).toDouble(), (json['customLabelOffset']['dy'] as num).toDouble())
+          : null,
+      draggable: json['draggable'] as bool? ?? true,
+      deletable: json['deletable'] as bool? ?? true,
+    );
+  }
 }

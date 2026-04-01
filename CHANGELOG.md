@@ -1,3 +1,58 @@
+## 1.2.0
+
+**Serialization, Sync API & Free Movement for All Drawing Tools**
+
+### Breaking Changes
+* **`FibonacciOptions.onMoved`** signature changed: `(double, double)` → `(double, double, int?, int?)` — now includes `startTime` and `endTime` for horizontal movement
+* **`PriceZoneOptions.onRangeChanged`** signature changed: `(double, double)` → `(double, double, int?, int?)` — now includes `startTime` and `endTime`
+* **`TapDetails.candle`** is now nullable (`CandleData?`) — returns `null` when tapping in future (empty) space
+
+### Serialization & Sync API
+* **`toJson()` / `fromJson()`** on all 14 overlay classes and their style/options: `TradingLine`, `PriceZone`, `FibonacciRetracement`, `FibonacciExtension`, `FibonacciFan`, `TrendLine`, `VerticalLine`, `TextTool`, `BrushTool`, `ArrowTool`, `CircleTool`, `RulerTool`, `GanttTool`, `PositionTool`
+* **`serializeAll()` / `restoreAll()`** on all managers: `TradingLineManager`, `PriceZoneManager`, `FibonacciManager`, `TrendLineManager`
+* **New `ChartDrawingManager`** — unified manager combining all drawing types with single `serializeAll()` / `restoreAll()` for complete chart state
+* **`DrawingChangeCallback`** — unified callback for real-time sync between devices (`onDrawingChanged`)
+
+### Free Movement & Corner Handles
+* **Fibonacci Retracement** — now supports full 2D drag (X + Y), with top-left and bottom-right corner handles for resizing both price range and time range simultaneously
+* **Price Zones (Demand/Supply)** — same corner-handle system as Fibonacci, with full 2D movement and resizing
+* **`FibonacciManager.updateFibonacciRange()`** now accepts optional `startTime`/`endTime`
+* **`PriceZoneManager.updateZoneRange()`** now accepts optional `startTime`/`endTime`
+
+### Future Space (Drawing Beyond Last Candle)
+* **New `futureCandles` parameter** on `InteractiveChart` — adds scrollable empty space to the right of the last candle (like TradingView)
+* **`TapDetails.timestamp`** — extrapolated timestamp available for all taps, including future space
+* **`TapDetails.isFutureSpace`** — boolean to detect taps in empty area
+* All drawing tools can now be dragged and dropped into future space
+
+### Rendering Improvements
+* **`PainterParams.fitTimestamp()`** — converts any timestamp to X coordinate with interpolation/extrapolation for positions between or beyond loaded candles
+* **`PainterParams.getTimestampFromX()`** — reverse conversion, X coordinate to extrapolated timestamp
+* All time-based drawing tools now render after `restoreAll()` even when candle data doesn't include the exact timestamps (Brush, Arrow, Text, VerticalLine, Circle, Ruler, Gantt, FibonacciExtension, FibonacciFan, TrendLine)
+* Drag previews now render correctly in future space for all tools
+
+### Bug Fixes
+* Fixed volume warning (`volumeHeightFactor`) printing 188k+ times — now prints only once
+
+---
+
+## 1.1.8
+
+**🎯 TradingLine Style Improvements**
+
+### 🔧 Enhancements
+* **Exposed labelPadding parameters** in `TradingLineStyle`:
+  * `labelHorizontalPadding` - Horizontal padding for the label (default: 2)
+  * `labelVerticalPadding` - Vertical gap between label and line (default: 1)
+* **Reduced default values** for a more compact appearance:
+  * `lineWidth`: 1.5 → 1.0
+  * `labelFontSize`: 12 → 10
+  * `priceFontSize`: 11 → 10
+  * `labelHorizontalPadding`: 4 → 2
+  * `labelVerticalPadding`: 2 → 1
+
+---
+
 ## 1.1.7
 
 **🎨 Complete Drawing Tools Suite - 26 Professional Tools**

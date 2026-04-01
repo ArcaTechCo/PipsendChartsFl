@@ -5,6 +5,8 @@ import 'chart_style.dart';
 import 'candle_data.dart';
 
 class PainterParams {
+  static bool _volumeWarningShown = false;
+
   final List<CandleData> candles;
   final ChartStyle style;
   final Size size;
@@ -62,6 +64,89 @@ class PainterParams {
   double fitPrice(double y) =>
       priceHeight * (maxPrice - y) / (maxPrice - minPrice);
 
+  /// Converts a timestamp to an X coordinate on the chart.
+  ///
+  /// Unlike `indexWhere`, this method handles timestamps that fall outside
+  /// or between loaded candles by interpolating/extrapolating based on
+  /// the average candle spacing.
+  ///
+  /// Returns `null` only if there are fewer than 2 candles loaded
+  /// (not enough data to determine spacing).
+  double? fitTimestamp(int timestamp) {
+    if (candles.isEmpty) return null;
+
+    // Exact match or first candle >= timestamp
+    final idx = candles.indexWhere((c) => c.timestamp >= timestamp);
+
+    if (idx >= 0) {
+      final candle = candles[idx];
+      if (candle.timestamp == timestamp) {
+        return idx * candleWidth;
+      }
+      // timestamp is between candles[idx-1] and candles[idx]
+      if (idx > 0) {
+        final prev = candles[idx - 1];
+        final next = candle;
+        final t = (timestamp - prev.timestamp) /
+            (next.timestamp - prev.timestamp);
+        return (idx - 1 + t) * candleWidth;
+      }
+      // timestamp is before the first candle — extrapolate left
+      if (candles.length < 2) return null;
+      final avgSpacing =
+          (candles.last.timestamp - candles.first.timestamp) /
+              (candles.length - 1);
+      if (avgSpacing <= 0) return 0;
+      final candlesBack =
+          (candles.first.timestamp - timestamp) / avgSpacing;
+      return -candlesBack * candleWidth;
+    }
+
+    // idx == -1: timestamp is after the last candle — extrapolate right
+    if (candles.length < 2) return null;
+    final avgSpacing =
+        (candles.last.timestamp - candles.first.timestamp) /
+            (candles.length - 1);
+    if (avgSpacing <= 0) return (candles.length - 1) * candleWidth;
+    final candlesForward =
+        (timestamp - candles.last.timestamp) / avgSpacing;
+    return (candles.length - 1 + candlesForward) * candleWidth;
+  }
+
+  /// Converts an X coordinate to a timestamp, with extrapolation
+  /// for positions beyond loaded candle data.
+  ///
+  /// Returns `null` only if there are fewer than 2 candles loaded.
+  int? getTimestampFromX(double x) {
+    if (candles.length < 2) return null;
+
+    final avgSpacing =
+        (candles.last.timestamp - candles.first.timestamp) /
+            (candles.length - 1);
+
+    // Convert X to a fractional candle index
+    final fractionalIndex = x / candleWidth;
+
+    // Within loaded range
+    final floorIndex = fractionalIndex.floor();
+    if (floorIndex >= 0 && floorIndex < candles.length - 1) {
+      final t = fractionalIndex - floorIndex;
+      return (candles[floorIndex].timestamp +
+              (candles[floorIndex + 1].timestamp - candles[floorIndex].timestamp) * t)
+          .round();
+    }
+
+    // Before first candle — extrapolate left
+    if (floorIndex < 0) {
+      return (candles.first.timestamp + fractionalIndex * avgSpacing).round();
+    }
+
+    // After last candle — extrapolate right
+    return (candles.last.timestamp +
+            (fractionalIndex - (candles.length - 1)) * avgSpacing)
+        .round();
+  }
+
   /// Get the price value from a Y coordinate on the chart.
   double getPriceFromY(double y) =>
       maxPrice - (y * (maxPrice - minPrice) / priceHeight);
@@ -75,7 +160,8 @@ class PainterParams {
       // are the same. It's likely they passed in a bunch of zeroes, because
       // they don't have real volume data or don't want to draw volumes.
       assert(() {
-        if (style.volumeHeightFactor != 0) {
+        if (style.volumeHeightFactor != 0 && !_volumeWarningShown) {
+          _volumeWarningShown = true;
           print('If you do not want to show volumes, '
               'make sure to set `volumeHeightFactor` (ChartStyle) to zero.');
         }

@@ -61,112 +61,80 @@ class FibonacciRetracement extends ChartOverlay {
     return lowPrice + (highPrice - lowPrice) * (1.0 - level);
   }
 
+  /// Resolves the start X coordinate using fitTimestamp or full-width fallback.
+  double _getStartX(PainterParams params) {
+    if (startTime != null) {
+      return params.fitTimestamp(startTime!) ?? 0;
+    }
+    return 0;
+  }
+
+  /// Resolves the end X coordinate using fitTimestamp or full-width fallback.
+  double _getEndX(PainterParams params) {
+    if (endTime != null) {
+      return params.fitTimestamp(endTime!) ?? params.chartWidth;
+    }
+    return params.chartWidth;
+  }
+
   @override
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
-    
-    // Calculate X coordinates based on timestamps
-    double startX = 0;
-    double endX = params.chartWidth;
-    
-    if (startTime != null || endTime != null) {
-      final visibleStartTime = params.candles.first.timestamp;
-      final visibleEndTime = params.candles.last.timestamp;
-      
-      // Check if Fibonacci is completely outside visible range
-      if (startTime != null && startTime! > visibleEndTime) return;
-      if (endTime != null && endTime! < visibleStartTime) return;
-      
-      if (startTime != null) {
-        final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime!);
-        if (startIndex >= 0) {
-          startX = startIndex * params.candleWidth;
-        }
-      }
-      
-      if (endTime != null) {
-        final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime!);
-        if (endIndex >= 0) {
-          endX = endIndex * params.candleWidth;
-        }
-      }
-      
-      // Clip to visible range
-      startX = startX.clamp(0.0, params.chartWidth);
-      endX = endX.clamp(0.0, params.chartWidth);
-    }
-    
+
+    final startX = _getStartX(params);
+    final endX = _getEndX(params);
+
+    final highY = params.fitPrice(highPrice);
+    final lowY = params.fitPrice(lowPrice);
+
     // Draw background highlight when being dragged
     if (isBeingDragged) {
-      final highY = params.fitPrice(highPrice);
-      final lowY = params.fitPrice(lowPrice);
       final bgPaint = Paint()
         ..color = const Color(0xFF2196F3).withOpacity(0.1)
         ..style = PaintingStyle.fill;
-      canvas.drawRect(
-        Rect.fromLTRB(startX, highY, endX, lowY),
-        bgPaint,
-      );
+      canvas.drawRect(Rect.fromLTRB(startX, highY, endX, lowY), bgPaint);
     }
-    
+
     // Draw each Fibonacci level
     for (final level in levels) {
       final price = getPriceAtLevel(level);
       final y = params.fitPrice(price);
-      
-      // Get color for this level
       final color = style.getColorForLevel(level);
-      
-      // Draw horizontal line
+
       final paint = Paint()
         ..color = isBeingDragged ? color : color.withOpacity(0.8)
         ..strokeWidth = isBeingDragged ? style.lineWidth + 1.0 : style.lineWidth
         ..style = PaintingStyle.stroke;
-      
-      final lineEndX = options.extendLines ? endX : endX * 0.7;
-      canvas.drawLine(
-        Offset(startX, y),
-        Offset(lineEndX, y),
-        paint,
-      );
-      
-      // Draw label if enabled
+
+      canvas.drawLine(Offset(startX, y), Offset(endX, y), paint);
+
       if (options.showLabels) {
-        _drawLabel(canvas, level, price, y, params, color);
+        _drawLabel(canvas, level, price, y, endX, color);
       }
     }
-    
-    // Draw resize handles
+
+    // Draw resize handles: top-left (highPrice/startTime) and bottom-right (lowPrice/endTime)
     if (options.draggable) {
-      _drawResizeHandles(canvas, params, isBeingDragged);
+      _drawHandle(canvas, startX, highY, isBeingDragged);
+      _drawHandle(canvas, endX, lowY, isBeingDragged);
     }
   }
-  
-  void _drawResizeHandles(Canvas canvas, PainterParams params, bool isBeingDragged) {
-    final highY = params.fitPrice(highPrice);
-    final lowY = params.fitPrice(lowPrice);
-    final centerX = params.chartWidth / 2;
-    
-    // Make handles more visible when being dragged
+
+  void _drawHandle(Canvas canvas, double x, double y, bool isBeingDragged) {
     final handleSize = isBeingDragged ? 8.0 : 6.0;
     final opacity = isBeingDragged ? 1.0 : 0.7;
-    
+
     final handlePaint = Paint()
       ..color = const Color(0xFF2196F3).withOpacity(opacity)
       ..style = PaintingStyle.fill;
-    
+
     final borderPaint = Paint()
       ..color = const Color(0xFFFFFFFF).withOpacity(opacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
-    
-    // Top handle (highPrice)
-    canvas.drawCircle(Offset(centerX, highY), handleSize, handlePaint);
-    canvas.drawCircle(Offset(centerX, highY), handleSize, borderPaint);
-    
-    // Bottom handle (lowPrice)
-    canvas.drawCircle(Offset(centerX, lowY), handleSize, handlePaint);
-    canvas.drawCircle(Offset(centerX, lowY), handleSize, borderPaint);
+
+    canvas.drawCircle(Offset(x, y), handleSize, handlePaint);
+    canvas.drawCircle(Offset(x, y), handleSize, borderPaint);
   }
 
   void _drawLabel(
@@ -174,99 +142,86 @@ class FibonacciRetracement extends ChartOverlay {
     double level,
     double price,
     double y,
-    PainterParams params,
+    double endX,
     Color color,
   ) {
     final textParts = <String>[];
-    
-    // Add percentage
     if (options.showPercentages) {
       textParts.add('${(level * 100).toStringAsFixed(1)}%');
     }
-    
-    // Add price
     if (options.showPrices) {
-      textParts.add('\$${price.toStringAsFixed(2)}');
+      textParts.add(price.toStringAsFixed(5));
     }
-    
     if (textParts.isEmpty) return;
-    
-    final text = textParts.join(' - ');
+
+    final text = textParts.join(' ');
     final textStyle = style.labelStyle ?? TextStyle(
       color: color,
       fontSize: 11,
       fontWeight: FontWeight.w500,
     );
-    
-    final textSpan = TextSpan(text: text, style: textStyle);
+
     final textPainter = TextPainter(
-      text: textSpan,
+      text: TextSpan(text: text, style: textStyle),
       textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    
-    // Position label on the right side
-    final x = params.chartWidth - textPainter.width - 8.0;
+    )..layout();
+
+    // Position label at the right end of the Fibonacci lines
+    final labelX = endX + 4.0;
     final labelY = y - textPainter.height / 2;
-    
-    // Draw background for better readability
+
     final bgPaint = Paint()
       ..color = const Color(0xFF000000).withOpacity(0.6)
       ..style = PaintingStyle.fill;
-    
-    final bgRect = Rect.fromLTWH(
-      x - 4,
-      labelY - 2,
-      textPainter.width + 8,
-      textPainter.height + 4,
+
+    canvas.drawRect(
+      Rect.fromLTWH(labelX - 2, labelY - 2, textPainter.width + 4, textPainter.height + 4),
+      bgPaint,
     );
-    canvas.drawRect(bgRect, bgPaint);
-    
-    // Draw text
-    textPainter.paint(canvas, Offset(x, labelY));
+
+    textPainter.paint(canvas, Offset(labelX, labelY));
   }
 
   @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
-    
-    // Check if position is within the Fibonacci area (between high and low)
+
+    final startX = _getStartX(params);
+    final endX = _getEndX(params);
     final highY = params.fitPrice(highPrice);
     final lowY = params.fitPrice(lowPrice);
-    
-    // Check if Y position is within the Fibonacci range
+
+    final minX = startX < endX ? startX : endX;
+    final maxX = startX > endX ? startX : endX;
     final minY = highY < lowY ? highY : lowY;
     final maxY = highY > lowY ? highY : lowY;
-    
-    return position.dy >= minY && position.dy <= maxY;
+
+    return position.dx >= minX && position.dx <= maxX &&
+           position.dy >= minY && position.dy <= maxY;
   }
 
-  /// Checks if the position is on the top handle (highPrice).
+  /// Checks if the position is on the top-left handle (highPrice + startTime).
   bool hitTestTopHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
-    
-    final highY = params.fitPrice(highPrice);
-    final handleSize = 20.0; // Larger touch area for easier interaction
-    final centerX = params.chartWidth / 2;
-    
-    final dx = (position.dx - centerX).abs();
-    final dy = (position.dy - highY).abs();
-    
-    return dx <= handleSize && dy <= handleSize;
+
+    final x = _getStartX(params);
+    final y = params.fitPrice(highPrice);
+    const handleSize = 20.0;
+
+    return (position.dx - x).abs() <= handleSize &&
+           (position.dy - y).abs() <= handleSize;
   }
-  
-  /// Checks if the position is on the bottom handle (lowPrice).
+
+  /// Checks if the position is on the bottom-right handle (lowPrice + endTime).
   bool hitTestBottomHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
-    
-    final lowY = params.fitPrice(lowPrice);
-    final handleSize = 20.0; // Larger touch area for easier interaction
-    final centerX = params.chartWidth / 2;
-    
-    final dx = (position.dx - centerX).abs();
-    final dy = (position.dy - lowY).abs();
-    
-    return dx <= handleSize && dy <= handleSize;
+
+    final x = _getEndX(params);
+    final y = params.fitPrice(lowPrice);
+    const handleSize = 20.0;
+
+    return (position.dx - x).abs() <= handleSize &&
+           (position.dy - y).abs() <= handleSize;
   }
 
   /// Creates a copy with new price points.
@@ -280,6 +235,34 @@ class FibonacciRetracement extends ChartOverlay {
       visible: visible,
       startTime: startTime,
       endTime: endTime,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'highPrice': highPrice,
+    'lowPrice': lowPrice,
+    'style': style.toJson(),
+    'options': options.toJson(),
+    'visible': visible,
+    if (startTime != null) 'startTime': startTime,
+    if (endTime != null) 'endTime': endTime,
+  };
+
+  factory FibonacciRetracement.fromJson(Map<String, dynamic> json) {
+    return FibonacciRetracement(
+      id: json['id'] as String?,
+      highPrice: (json['highPrice'] as num).toDouble(),
+      lowPrice: (json['lowPrice'] as num).toDouble(),
+      style: json['style'] != null
+          ? FibonacciStyle.fromJson(json['style'] as Map<String, dynamic>)
+          : null,
+      options: json['options'] != null
+          ? FibonacciOptions.fromJson(json['options'] as Map<String, dynamic>)
+          : null,
+      visible: json['visible'] as bool? ?? true,
+      startTime: json['startTime'] as int?,
+      endTime: json['endTime'] as int?,
     );
   }
 

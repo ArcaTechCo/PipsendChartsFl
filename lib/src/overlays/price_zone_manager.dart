@@ -143,16 +143,21 @@ class PriceZoneManager {
   /// Updates the price range of a zone.
   ///
   /// Returns true if the zone was found and updated, false otherwise.
-  bool updateZoneRange(String id, double newMinPrice, double newMaxPrice) {
+  bool updateZoneRange(String id, double newMinPrice, double newMaxPrice, {int? startTime, int? endTime}) {
     if (newMaxPrice <= newMinPrice) return false;
-    
+
     final index = _zones.indexWhere((zone) => zone.id == id);
     if (index == -1) return false;
 
     final oldZone = _zones[index];
-    final updatedZone = oldZone.withRange(newMinPrice, newMaxPrice);
+    final updatedZone = oldZone.copyWith(
+      minPrice: newMinPrice,
+      maxPrice: newMaxPrice,
+      startTime: startTime ?? oldZone.startTime,
+      endTime: endTime ?? oldZone.endTime,
+    );
     _zones[index] = updatedZone;
-    
+
     _notifyListeners(PriceZoneEvent.rangeChanged(
       updatedZone,
       oldZone.minPrice,
@@ -160,7 +165,7 @@ class PriceZoneManager {
       newMinPrice,
       newMaxPrice,
     ));
-    
+
     return true;
   }
   
@@ -354,6 +359,18 @@ class PriceZoneManager {
   /// Sorts zones by type.
   void sortByType() {
     _zones.sort((a, b) => a.type.index.compareTo(b.type.index));
+  }
+
+  List<Map<String, dynamic>> serializeAll() {
+    return _zones.map((zone) => zone.toJson()).toList();
+  }
+
+  void restoreAll(List<Map<String, dynamic>> data) {
+    _zones.clear();
+    for (final json in data) {
+      _zones.add(PriceZone.fromJson(json));
+    }
+    _notifyListeners(PriceZoneEvent.cleared());
   }
 
   @override

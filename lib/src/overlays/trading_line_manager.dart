@@ -398,6 +398,18 @@ class TradingLineManager {
     _lines.sort((a, b) => a.type.index.compareTo(b.type.index));
   }
 
+  List<Map<String, dynamic>> serializeAll() {
+    return _lines.map((line) => line.toJson()).toList();
+  }
+
+  void restoreAll(List<Map<String, dynamic>> data) {
+    _lines.clear();
+    for (final json in data) {
+      _lines.add(TradingLine.fromJson(json));
+    }
+    _notifyListeners(TradingLineEvent.cleared());
+  }
+
   @override
   String toString() => 'TradingLineManager(count: $count)';
 }

@@ -18,8 +18,8 @@ class FibonacciOptions {
   final bool extendLines;
   
   /// Callback when the Fibonacci is moved.
-  /// Parameters: newHighPrice, newLowPrice
-  final void Function(double newHighPrice, double newLowPrice)? onMoved;
+  /// Parameters: newHighPrice, newLowPrice, newStartTime, newEndTime
+  final void Function(double newHighPrice, double newLowPrice, int? newStartTime, int? newEndTime)? onMoved;
   
   /// Callback when the Fibonacci is deleted.
   final VoidCallback? onDelete;
@@ -34,13 +34,31 @@ class FibonacciOptions {
     this.onDelete,
   });
 
+  Map<String, dynamic> toJson() => {
+    'draggable': draggable,
+    'showLabels': showLabels,
+    'showPercentages': showPercentages,
+    'showPrices': showPrices,
+    'extendLines': extendLines,
+  };
+
+  factory FibonacciOptions.fromJson(Map<String, dynamic> json) {
+    return FibonacciOptions(
+      draggable: json['draggable'] as bool? ?? true,
+      showLabels: json['showLabels'] as bool? ?? true,
+      showPercentages: json['showPercentages'] as bool? ?? true,
+      showPrices: json['showPrices'] as bool? ?? true,
+      extendLines: json['extendLines'] as bool? ?? false,
+    );
+  }
+
   FibonacciOptions copyWith({
     bool? draggable,
     bool? showLabels,
     bool? showPercentages,
     bool? showPrices,
     bool? extendLines,
-    void Function(double, double)? onMoved,
+    void Function(double, double, int?, int?)? onMoved,
     VoidCallback? onDelete,
   }) {
     return FibonacciOptions(

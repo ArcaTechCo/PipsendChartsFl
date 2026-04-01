@@ -53,6 +53,40 @@ class FibonacciStyle {
     return level50Color; // Default
   }
 
+  Map<String, dynamic> toJson() => {
+    'level0Color': level0Color.value,
+    'level236Color': level236Color.value,
+    'level382Color': level382Color.value,
+    'level50Color': level50Color.value,
+    'level618Color': level618Color.value,
+    'level786Color': level786Color.value,
+    'level100Color': level100Color.value,
+    'lineWidth': lineWidth,
+    if (labelStyle != null) 'labelStyle': {
+      'color': labelStyle!.color?.value,
+      'fontSize': labelStyle!.fontSize,
+      'fontWeight': labelStyle!.fontWeight?.index,
+    },
+  };
+
+  factory FibonacciStyle.fromJson(Map<String, dynamic> json) {
+    return FibonacciStyle(
+      level0Color: Color(json['level0Color'] as int),
+      level236Color: Color(json['level236Color'] as int),
+      level382Color: Color(json['level382Color'] as int),
+      level50Color: Color(json['level50Color'] as int),
+      level618Color: Color(json['level618Color'] as int),
+      level786Color: Color(json['level786Color'] as int),
+      level100Color: Color(json['level100Color'] as int),
+      lineWidth: (json['lineWidth'] as num?)?.toDouble() ?? 1.0,
+      labelStyle: json['labelStyle'] != null ? TextStyle(
+        color: json['labelStyle']['color'] != null ? Color(json['labelStyle']['color'] as int) : null,
+        fontSize: (json['labelStyle']['fontSize'] as num?)?.toDouble(),
+        fontWeight: json['labelStyle']['fontWeight'] != null ? FontWeight.values[json['labelStyle']['fontWeight'] as int] : null,
+      ) : null,
+    );
+  }
+
   FibonacciStyle copyWith({
     Color? level0Color,
     Color? level236Color,

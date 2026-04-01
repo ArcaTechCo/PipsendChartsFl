@@ -12,8 +12,9 @@ class PriceZoneOptions {
   /// Whether the zone can be resized.
   final bool resizable;
   
-  /// Callback when the zone's price range changes.
-  final void Function(double minPrice, double maxPrice)? onRangeChanged;
+  /// Callback when the zone's price range or time range changes.
+  /// Parameters: minPrice, maxPrice, startTime, endTime
+  final void Function(double minPrice, double maxPrice, int? startTime, int? endTime)? onRangeChanged;
   
   /// Callback when the zone is deleted.
   final void Function()? onDelete;
@@ -27,12 +28,28 @@ class PriceZoneOptions {
     this.onDelete,
   });
   
+  Map<String, dynamic> toJson() => {
+    if (label != null) 'label': label,
+    'showLabel': showLabel,
+    'draggable': draggable,
+    'resizable': resizable,
+  };
+
+  factory PriceZoneOptions.fromJson(Map<String, dynamic> json) {
+    return PriceZoneOptions(
+      label: json['label'] as String?,
+      showLabel: json['showLabel'] as bool? ?? true,
+      draggable: json['draggable'] as bool? ?? false,
+      resizable: json['resizable'] as bool? ?? false,
+    );
+  }
+
   PriceZoneOptions copyWith({
     String? label,
     bool? showLabel,
     bool? draggable,
     bool? resizable,
-    void Function(double, double)? onRangeChanged,
+    void Function(double, double, int?, int?)? onRangeChanged,
     void Function()? onDelete,
   }) {
     return PriceZoneOptions(

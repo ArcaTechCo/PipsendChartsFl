@@ -60,14 +60,10 @@ class GanttTool extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
     
-    // Find indices for start and end
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return;
-    
-    final x1 = startIndex * params.candleWidth;
-    final x2 = endIndex * params.candleWidth;
+    // Find screen coordinates for start and end
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return;
     final yCenter = params.fitPrice(price);
     final yTop = params.fitPrice(price + height / 2);
     final yBottom = params.fitPrice(price - height / 2);
@@ -181,14 +177,10 @@ class GanttTool extends ChartOverlay {
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
     
-    // Find indices for start and end
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    
-    if (startIndex < 0 || endIndex < 0) return false;
-    
-    final x1 = startIndex * params.candleWidth;
-    final x2 = endIndex * params.candleWidth;
+    // Find screen coordinates for start and end
+    final x1 = params.fitTimestamp(startTime);
+    final x2 = params.fitTimestamp(endTime);
+    if (x1 == null || x2 == null) return false;
     final yTop = params.fitPrice(price + height / 2);
     final yBottom = params.fitPrice(price - height / 2);
     
@@ -201,10 +193,9 @@ class GanttTool extends ChartOverlay {
   bool hitTestStartHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final startIndex = params.candles.indexWhere((c) => c.timestamp >= startTime);
-    if (startIndex < 0) return false;
-    
-    final x = startIndex * params.candleWidth;
+    final x = params.fitTimestamp(startTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(price);
     
     const handleSize = 20.0;
@@ -215,14 +206,65 @@ class GanttTool extends ChartOverlay {
   bool hitTestEndHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    if (endIndex < 0) return false;
-    
-    final x = endIndex * params.candleWidth;
+    final x = params.fitTimestamp(endTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(price);
     
     const handleSize = 20.0;
     return (position - Offset(x, y)).distance < handleSize;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startTime': startTime,
+    'endTime': endTime,
+    'price': price,
+    'height': height,
+    'label': label,
+    'style': {
+      'fillColor': style.fillColor.value,
+      'fillOpacity': style.fillOpacity,
+      'borderColor': style.borderColor.value,
+      'borderWidth': style.borderWidth,
+      'borderRadius': style.borderRadius,
+      'showLabel': style.showLabel,
+      'labelColor': style.labelColor.value,
+      'labelFontSize': style.labelFontSize,
+      'labelBackground': style.labelBackground,
+    },
+    'options': {
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory GanttTool.fromJson(Map<String, dynamic> json) {
+    final s = json['style'] as Map<String, dynamic>?;
+    final o = json['options'] as Map<String, dynamic>?;
+    return GanttTool(
+      id: json['id'] as String?,
+      startTime: json['startTime'] as int,
+      endTime: json['endTime'] as int,
+      price: (json['price'] as num).toDouble(),
+      height: (json['height'] as num?)?.toDouble() ?? 5.0,
+      label: json['label'] as String? ?? '',
+      style: s != null ? GanttToolStyle(
+        fillColor: Color(s['fillColor'] as int),
+        fillOpacity: (s['fillOpacity'] as num?)?.toDouble() ?? 0.3,
+        borderColor: Color(s['borderColor'] as int),
+        borderWidth: (s['borderWidth'] as num?)?.toDouble() ?? 2.0,
+        borderRadius: (s['borderRadius'] as num?)?.toDouble() ?? 4.0,
+        showLabel: s['showLabel'] as bool? ?? true,
+        labelColor: s['labelColor'] != null ? Color(s['labelColor'] as int) : const Color(0xFFFFFFFF),
+        labelFontSize: (s['labelFontSize'] as num?)?.toDouble() ?? 12.0,
+        labelBackground: s['labelBackground'] as bool? ?? true,
+      ) : null,
+      options: o != null ? GanttToolOptions(
+        draggable: o['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
+    );
   }
 
   /// Creates a copy with updated properties.

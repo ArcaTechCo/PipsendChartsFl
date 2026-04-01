@@ -173,8 +173,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         label: 'Demand Zone',
         showLabel: true,
         draggable: true,
-        onRangeChanged: (newMin, newMax) {
-          _zoneManager.updateZoneRange(demandId, newMin, newMax);
+        onRangeChanged: (newMin, newMax, newStartTime, newEndTime) {
+          _zoneManager.updateZoneRange(demandId, newMin, newMax, startTime: newStartTime, endTime: newEndTime);
         },
       ),
     ));
@@ -191,8 +191,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         showLabels: true,
         showPercentages: true,
         draggable: true,
-        onMoved: (newHigh, newLow) {
-          _fibonacciManager.updateFibonacciRange(fibId, newHigh, newLow);
+        onMoved: (newHigh, newLow, newStartTime, newEndTime) {
+          _fibonacciManager.updateFibonacciRange(fibId, newHigh, newLow, startTime: newStartTime, endTime: newEndTime);
         },
       ),
     ));
@@ -609,8 +609,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         label: 'Demand Zone',
         showLabel: true,
         draggable: true,
-        onRangeChanged: (newMin, newMax) {
-          _zoneManager.updateZoneRange(zoneId, newMin, newMax);
+        onRangeChanged: (newMin, newMax, newStartTime, newEndTime) {
+          _zoneManager.updateZoneRange(zoneId, newMin, newMax, startTime: newStartTime, endTime: newEndTime);
         },
       ),
     ));
@@ -641,8 +641,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         label: 'Supply Zone',
         showLabel: true,
         draggable: true,
-        onRangeChanged: (newMin, newMax) {
-          _zoneManager.updateZoneRange(zoneId, newMin, newMax);
+        onRangeChanged: (newMin, newMax, newStartTime, newEndTime) {
+          _zoneManager.updateZoneRange(zoneId, newMin, newMax, startTime: newStartTime, endTime: newEndTime);
         },
       ),
     ));
@@ -988,8 +988,8 @@ class _TabbedChartExampleState extends State<TabbedChartExample> with SingleTick
         showLabels: true,
         showPercentages: true,
         draggable: true,
-        onMoved: (newHigh, newLow) {
-          _fibonacciManager.updateFibonacciRange(fibId, newHigh, newLow);
+        onMoved: (newHigh, newLow, newStartTime, newEndTime) {
+          _fibonacciManager.updateFibonacciRange(fibId, newHigh, newLow, startTime: newStartTime, endTime: newEndTime);
         },
       ),
     ));

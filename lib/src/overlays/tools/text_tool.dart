@@ -52,10 +52,9 @@ class TextTool extends ChartOverlay {
     if (!visible || text.isEmpty) return;
     
     // Find position
-    final index = params.candles.indexWhere((c) => c.timestamp >= timestamp);
-    if (index < 0) return;
-    
-    final x = index * params.candleWidth;
+    final x = params.fitTimestamp(timestamp);
+    if (x == null) return;
+
     final y = params.fitPrice(price);
     
     // Draw background highlight when being dragged
@@ -176,10 +175,9 @@ class TextTool extends ChartOverlay {
     if (!interactive) return false;
     
     // Find position
-    final index = params.candles.indexWhere((c) => c.timestamp >= timestamp);
-    if (index < 0) return false;
-    
-    final x = index * params.candleWidth;
+    final x = params.fitTimestamp(timestamp);
+    if (x == null) return false;
+
     final y = params.fitPrice(price);
     
     // Test if touching the handle or text area
@@ -206,6 +204,64 @@ class TextTool extends ChartOverlay {
     );
     
     return textRect.inflate(10).contains(position);
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'timestamp': timestamp,
+    'price': price,
+    'text': text,
+    'style': {
+      'textColor': style.textColor.value,
+      'fontSize': style.fontSize,
+      'fontWeight': style.fontWeight.index,
+      'fontStyle': style.fontStyle.index,
+      'textAlign': style.textAlign.name,
+      'horizontalAlignment': style.horizontalAlignment.name,
+      'verticalAlignment': style.verticalAlignment.name,
+      'showBackground': style.showBackground,
+      'backgroundColor': style.backgroundColor.value,
+      'padding': style.padding,
+      'borderRadius': style.borderRadius,
+      'showBorder': style.showBorder,
+      'borderColor': style.borderColor.value,
+      'borderWidth': style.borderWidth,
+    },
+    'options': {
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory TextTool.fromJson(Map<String, dynamic> json) {
+    final s = json['style'] as Map<String, dynamic>?;
+    final o = json['options'] as Map<String, dynamic>?;
+    return TextTool(
+      id: json['id'] as String?,
+      timestamp: json['timestamp'] as int,
+      price: (json['price'] as num).toDouble(),
+      text: json['text'] as String,
+      style: s != null ? TextToolStyle(
+        textColor: Color(s['textColor'] as int),
+        fontSize: (s['fontSize'] as num?)?.toDouble() ?? 14.0,
+        fontWeight: s['fontWeight'] != null ? FontWeight.values[s['fontWeight'] as int] : FontWeight.normal,
+        fontStyle: s['fontStyle'] != null ? FontStyle.values[s['fontStyle'] as int] : FontStyle.normal,
+        textAlign: TextAlign.values.firstWhere((e) => e.name == s['textAlign'], orElse: () => TextAlign.left),
+        horizontalAlignment: TextHorizontalAlignment.values.firstWhere((e) => e.name == s['horizontalAlignment'], orElse: () => TextHorizontalAlignment.center),
+        verticalAlignment: TextVerticalAlignment.values.firstWhere((e) => e.name == s['verticalAlignment'], orElse: () => TextVerticalAlignment.middle),
+        showBackground: s['showBackground'] as bool? ?? true,
+        backgroundColor: s['backgroundColor'] != null ? Color(s['backgroundColor'] as int) : const Color(0xFF000000),
+        padding: (s['padding'] as num?)?.toDouble() ?? 6.0,
+        borderRadius: (s['borderRadius'] as num?)?.toDouble() ?? 4.0,
+        showBorder: s['showBorder'] as bool? ?? true,
+        borderColor: s['borderColor'] != null ? Color(s['borderColor'] as int) : const Color(0xFF2196F3),
+        borderWidth: (s['borderWidth'] as num?)?.toDouble() ?? 1.0,
+      ) : null,
+      options: o != null ? TextToolOptions(
+        draggable: o['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
+    );
   }
 
   /// Creates a copy with updated properties.

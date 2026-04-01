@@ -82,6 +82,32 @@ class PriceZoneStyle {
     }
   }
   
+  Map<String, dynamic> toJson() => {
+    'fillColor': fillColor.value,
+    'borderColor': borderColor.value,
+    'borderWidth': borderWidth,
+    'showBorder': showBorder,
+    if (labelStyle != null) 'labelStyle': {
+      'color': labelStyle!.color?.value,
+      'fontSize': labelStyle!.fontSize,
+      'fontWeight': labelStyle!.fontWeight?.index,
+    },
+  };
+
+  factory PriceZoneStyle.fromJson(Map<String, dynamic> json) {
+    return PriceZoneStyle(
+      fillColor: Color(json['fillColor'] as int),
+      borderColor: json['borderColor'] != null ? Color(json['borderColor'] as int) : null,
+      borderWidth: (json['borderWidth'] as num?)?.toDouble() ?? 1.0,
+      showBorder: json['showBorder'] as bool? ?? true,
+      labelStyle: json['labelStyle'] != null ? TextStyle(
+        color: json['labelStyle']['color'] != null ? Color(json['labelStyle']['color'] as int) : null,
+        fontSize: (json['labelStyle']['fontSize'] as num?)?.toDouble(),
+        fontWeight: json['labelStyle']['fontWeight'] != null ? FontWeight.values[json['labelStyle']['fontWeight'] as int] : null,
+      ) : null,
+    );
+  }
+
   PriceZoneStyle copyWith({
     Color? fillColor,
     Color? borderColor,

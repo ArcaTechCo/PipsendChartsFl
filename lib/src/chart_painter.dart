@@ -126,7 +126,8 @@ class ChartPainter extends CustomPainter {
 
     // Draw tap highlight & overlay
     if (params.tapPosition != null) {
-      if (params.tapPosition!.dx < params.chartWidth) {
+      final tapIdx = params.getCandleIndexFromOffset(params.tapPosition!.dx);
+      if (tapIdx >= 0 && tapIdx < params.candles.length) {
         _drawTapHighlightAndOverlay(canvas, params);
       }
     }
@@ -151,76 +152,118 @@ class ChartPainter extends CustomPainter {
             draggedLine.paint(canvas, params, isBeingDragged: true);
           } else if (overlay is PriceZone) {
             // Handle resize vs drag
-            final PriceZone draggedZone;
-            // Minimum height: 0.1% of visible price range
+            PriceZone draggedZone;
             final visiblePriceRange = params.maxPrice - params.minPrice;
             final minZoneHeight = visiblePriceRange * 0.001;
-            
+
             if (isResizingTop) {
-              // Resizing top edge (maxPrice)
-              final newMaxPrice = draggedPrice!;
-              final minAllowedMaxPrice = overlay.minPrice + minZoneHeight;
-              draggedZone = overlay.withRange(
-                overlay.minPrice,
-                newMaxPrice > minAllowedMaxPrice ? newMaxPrice : minAllowedMaxPrice,
-              );
+              // Top-left handle: maxPrice + startTime
+              var newMax = draggedPrice!;
+              if (newMax < overlay.minPrice + minZoneHeight) {
+                newMax = overlay.minPrice + minZoneHeight;
+              }
+              final newStartTime = draggedPosition != null
+                  ? params.getTimestampFromX(draggedPosition!.dx)
+                  : overlay.startTime;
+              draggedZone = overlay.copyWith(maxPrice: newMax, startTime: newStartTime);
             } else if (isResizingBottom) {
-              // Resizing bottom edge (minPrice)
-              final newMinPrice = draggedPrice!;
-              final maxAllowedMinPrice = overlay.maxPrice - minZoneHeight;
-              draggedZone = overlay.withRange(
-                newMinPrice < maxAllowedMinPrice ? newMinPrice : maxAllowedMinPrice,
-                overlay.maxPrice,
-              );
+              // Bottom-right handle: minPrice + endTime
+              var newMin = draggedPrice!;
+              if (newMin > overlay.maxPrice - minZoneHeight) {
+                newMin = overlay.maxPrice - minZoneHeight;
+              }
+              final newEndTime = draggedPosition != null
+                  ? params.getTimestampFromX(draggedPosition!.dx)
+                  : overlay.endTime;
+              draggedZone = overlay.copyWith(minPrice: newMin, endTime: newEndTime);
             } else {
-              // Regular drag - move entire zone
-              // Use initial price to calculate offset, not current price
+              // Regular drag - move entire zone (X + Y)
               final initialPrice = draggedInitialPrice ?? draggedPrice!;
               final offset = draggedPrice! - initialPrice;
-              draggedZone = overlay.withRange(
-                overlay.minPrice + offset,
-                overlay.maxPrice + offset,
+              draggedZone = overlay.copyWith(
+                minPrice: overlay.minPrice + offset,
+                maxPrice: overlay.maxPrice + offset,
               );
+              if (draggedPosition != null && overlay.startTime != null) {
+                final origStartX = params.fitTimestamp(overlay.startTime!);
+                if (origStartX != null) {
+                  final deltaX = draggedPosition!.dx - origStartX;
+                  final newStartTime = params.getTimestampFromX(origStartX + deltaX);
+                  if (newStartTime != null && overlay.endTime != null) {
+                    final origEndX = params.fitTimestamp(overlay.endTime!);
+                    final newEndTime = origEndX != null
+                        ? params.getTimestampFromX(origEndX + deltaX)
+                        : newStartTime + (overlay.endTime! - overlay.startTime!);
+                    draggedZone = draggedZone.copyWith(startTime: newStartTime, endTime: newEndTime);
+                  }
+                }
+              }
             }
             draggedZone.paint(canvas, params, isBeingDragged: true);
           } else if (overlay is FibonacciRetracement) {
             // Handle resize vs drag
-            final FibonacciRetracement draggedFib;
+            FibonacciRetracement draggedFib;
             
             if (isResizingFibonacci) {
-              // Resizing one edge
-              // Minimum height: 0.1% of visible price range
+              // Resizing a corner handle (top-left or bottom-right)
               final visiblePriceRange = params.maxPrice - params.minPrice;
               final minHeight = visiblePriceRange * 0.001;
-              
+
               if (isResizingTop) {
-                // Resizing top edge (highPrice)
-                final newHighPrice = draggedPrice!;
-                final newLowPrice = overlay.lowPrice;
-                final minAllowedHighPrice = newLowPrice + minHeight;
-                draggedFib = overlay.withPrices(
-                  newHighPrice > minAllowedHighPrice ? newHighPrice : minAllowedHighPrice,
-                  newLowPrice,
+                // Top-left handle: highPrice + startTime
+                var newHigh = draggedPrice!;
+                if (newHigh < overlay.lowPrice + minHeight) {
+                  newHigh = overlay.lowPrice + minHeight;
+                }
+                final newStartTime = draggedPosition != null
+                    ? params.getTimestampFromX(draggedPosition!.dx)
+                    : overlay.startTime;
+                draggedFib = overlay.copyWith(
+                  highPrice: newHigh,
+                  startTime: newStartTime,
                 );
               } else {
-                // Resizing bottom edge (lowPrice)
-                final newHighPrice = overlay.highPrice;
-                final newLowPrice = draggedPrice!;
-                final maxAllowedLowPrice = newHighPrice - minHeight;
-                draggedFib = overlay.withPrices(
-                  newHighPrice,
-                  newLowPrice < maxAllowedLowPrice ? newLowPrice : maxAllowedLowPrice,
+                // Bottom-right handle: lowPrice + endTime
+                var newLow = draggedPrice!;
+                if (newLow > overlay.highPrice - minHeight) {
+                  newLow = overlay.highPrice - minHeight;
+                }
+                final newEndTime = draggedPosition != null
+                    ? params.getTimestampFromX(draggedPosition!.dx)
+                    : overlay.endTime;
+                draggedFib = overlay.copyWith(
+                  lowPrice: newLow,
+                  endTime: newEndTime,
                 );
               }
             } else {
-              // Move entire Fibonacci retracement
-              // Use initial price to calculate offset, not current price
+              // Move entire Fibonacci retracement (X + Y)
               final initialPrice = draggedInitialPrice ?? draggedPrice!;
               final offset = draggedPrice! - initialPrice;
-              draggedFib = overlay.withPrices(
-                overlay.highPrice + offset,
-                overlay.lowPrice + offset,
+              draggedFib = overlay.copyWith(
+                highPrice: overlay.highPrice + offset,
+                lowPrice: overlay.lowPrice + offset,
               );
+              // Update horizontal position using delta from original position
+              if (draggedPosition != null && overlay.startTime != null) {
+                final origStartX = params.fitTimestamp(overlay.startTime!);
+                if (origStartX != null) {
+                  final deltaX = draggedPosition!.dx - origStartX;
+                  final newStartTime = params.getTimestampFromX(origStartX + deltaX);
+                  if (newStartTime != null && overlay.endTime != null) {
+                    final origEndX = params.fitTimestamp(overlay.endTime!);
+                    final newEndTime = origEndX != null
+                        ? params.getTimestampFromX(origEndX + deltaX)
+                        : newStartTime + (overlay.endTime! - overlay.startTime!);
+                    draggedFib = draggedFib.copyWith(
+                      startTime: newStartTime,
+                      endTime: newEndTime,
+                    );
+                  } else if (newStartTime != null) {
+                    draggedFib = draggedFib.copyWith(startTime: newStartTime);
+                  }
+                }
+              }
             }
             draggedFib.paint(canvas, params, isBeingDragged: true);
           } else if (overlay is TrendLine) {
@@ -229,9 +272,7 @@ class ChartPainter extends CustomPainter {
             
             if (isResizingTrendLine && draggedPosition != null) {
               // Resizing one endpoint - calculate new timestamp from X position
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               if (isResizingTrendStart) {
@@ -250,27 +291,23 @@ class ChartPainter extends CustomPainter {
             } else if (draggedPosition != null) {
               // Move entire trend line - calculate offset in both X and Y
               final priceOffset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
-              
-              // Calculate time offset based on X movement
-              final startIndex = params.candles.indexWhere((c) => c.timestamp >= overlay.startTime);
-              if (startIndex >= 0) {
-                final startX = params.xShift + startIndex * params.candleWidth;
+
+              final startX = params.fitTimestamp(overlay.startTime);
+              if (startX != null) {
                 final deltaX = draggedPosition!.dx - startX;
-                final candleOffset = (deltaX / params.candleWidth).round();
-                
-                // Find new timestamps
-                final newStartIndex = (startIndex + candleOffset).clamp(0, params.candles.length - 1);
-                final endIndex = params.candles.indexWhere((c) => c.timestamp >= overlay.endTime);
-                final newEndIndex = endIndex >= 0 ? (endIndex + candleOffset).clamp(0, params.candles.length - 1) : newStartIndex;
-                
+                final newStartTs = params.getTimestampFromX(startX + deltaX) ?? overlay.startTime;
+                final endX = params.fitTimestamp(overlay.endTime);
+                final newEndTs = endX != null
+                    ? (params.getTimestampFromX(endX + deltaX) ?? overlay.endTime)
+                    : newStartTs;
+
                 draggedTrend = overlay.withPoints(
-                  startTime: params.candles[newStartIndex].timestamp,
+                  startTime: newStartTs,
                   startPrice: overlay.startPrice + priceOffset,
-                  endTime: params.candles[newEndIndex].timestamp,
+                  endTime: newEndTs,
                   endPrice: overlay.endPrice + priceOffset,
                 );
               } else {
-                // Fallback: just move price
                 final offset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
                 draggedTrend = overlay.withPoints(
                   startPrice: overlay.startPrice + offset,
@@ -315,9 +352,7 @@ class ChartPainter extends CustomPainter {
             
             if (isResizingTrendLine && draggedPosition != null) {
               // Resizing one endpoint - calculate new timestamp from X position
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               if (isResizingTrendStart) {
@@ -336,27 +371,23 @@ class ChartPainter extends CustomPainter {
             } else if (draggedPosition != null) {
               // Move entire ruler - calculate offset in both X and Y
               final priceOffset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
-              
-              // Calculate time offset based on X movement
-              final startIndex = params.candles.indexWhere((c) => c.timestamp >= overlay.startTime);
-              if (startIndex >= 0) {
-                final startX = params.xShift + startIndex * params.candleWidth;
+
+              final startX = params.fitTimestamp(overlay.startTime);
+              if (startX != null) {
                 final deltaX = draggedPosition!.dx - startX;
-                final candleOffset = (deltaX / params.candleWidth).round();
-                
-                // Find new timestamps
-                final newStartIndex = (startIndex + candleOffset).clamp(0, params.candles.length - 1);
-                final endIndex = params.candles.indexWhere((c) => c.timestamp >= overlay.endTime);
-                final newEndIndex = endIndex >= 0 ? (endIndex + candleOffset).clamp(0, params.candles.length - 1) : newStartIndex;
-                
+                final newStartTs = params.getTimestampFromX(startX + deltaX) ?? overlay.startTime;
+                final endX = params.fitTimestamp(overlay.endTime);
+                final newEndTs = endX != null
+                    ? (params.getTimestampFromX(endX + deltaX) ?? overlay.endTime)
+                    : newStartTs;
+
                 draggedRuler = overlay.withPoints(
-                  startTime: params.candles[newStartIndex].timestamp,
+                  startTime: newStartTs,
                   startPrice: overlay.startPrice + priceOffset,
-                  endTime: params.candles[newEndIndex].timestamp,
+                  endTime: newEndTs,
                   endPrice: overlay.endPrice + priceOffset,
                 );
               } else {
-                // Fallback: just move price
                 final offset = draggedPrice! - ((overlay.startPrice + overlay.endPrice) / 2);
                 draggedRuler = overlay.withPoints(
                   startPrice: overlay.startPrice + offset,
@@ -376,9 +407,7 @@ class ChartPainter extends CustomPainter {
             // VerticalLine - move horizontally only
             if (draggedPosition != null && isDraggingVerticalLine) {
               // Calculate new timestamp from X position
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               
               final draggedVLine = overlay.copyWith(timestamp: newTimestamp);
               draggedVLine.paint(canvas, params, isBeingDragged: true);
@@ -388,9 +417,7 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is FibonacciExtension) {
             // FibonacciExtension - move individual points
             if (draggedPosition != null && draggedPrice != null) {
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               final FibonacciExtension draggedFibExt;
@@ -419,9 +446,7 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is FibonacciFan) {
             // FibonacciFan - move individual points
             if (draggedPosition != null && draggedPrice != null) {
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               final FibonacciFan draggedFibFan;
@@ -445,9 +470,7 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is ArrowTool) {
             // ArrowTool - move individual points
             if (draggedPosition != null && draggedPrice != null) {
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               final ArrowTool draggedArrow;
@@ -471,9 +494,7 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is CircleTool) {
             // CircleTool - move center or resize radius
             if (draggedPosition != null && draggedPrice != null) {
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               final CircleTool draggedCircle;
@@ -499,9 +520,7 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is TextTool) {
             // TextTool - move text
             if (draggedPosition != null && draggedPrice != null && isDraggingTextTool) {
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               final draggedText = overlay.copyWith(
@@ -515,9 +534,7 @@ class ChartPainter extends CustomPainter {
           } else if (overlay is GanttTool) {
             // GanttTool - move or resize
             if (draggedPosition != null && draggedPrice != null) {
-              final candleIndex = params.getCandleIndexFromOffset(draggedPosition!.dx);
-              final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-              final newTimestamp = params.candles[clampedIndex].timestamp;
+              final newTimestamp = params.getTimestampFromX(draggedPosition!.dx) ?? params.candles.last.timestamp;
               final newPrice = draggedPrice!;
               
               final GanttTool draggedGantt;

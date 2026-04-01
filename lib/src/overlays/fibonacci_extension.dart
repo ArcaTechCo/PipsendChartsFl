@@ -89,18 +89,14 @@ class FibonacciExtension extends ChartOverlay {
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;
     
-    // Find indices for the three points
-    final indexA = params.candles.indexWhere((c) => c.timestamp >= pointATime);
-    final indexB = params.candles.indexWhere((c) => c.timestamp >= pointBTime);
-    final indexC = params.candles.indexWhere((c) => c.timestamp >= pointCTime);
-    
-    if (indexA < 0 || indexB < 0 || indexC < 0) return;
-    
-    final xA = indexA * params.candleWidth;
+    // Find screen coordinates for the three points
+    final xA = params.fitTimestamp(pointATime);
+    final xB = params.fitTimestamp(pointBTime);
+    final xC = params.fitTimestamp(pointCTime);
+    if (xA == null || xB == null || xC == null) return;
+
     final yA = params.fitPrice(pointAPrice);
-    final xB = indexB * params.candleWidth;
     final yB = params.fitPrice(pointBPrice);
-    final xC = indexC * params.candleWidth;
     final yC = params.fitPrice(pointCPrice);
     
     // Draw background highlight when being dragged
@@ -263,10 +259,9 @@ class FibonacciExtension extends ChartOverlay {
   bool hitTestPointA(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final indexA = params.candles.indexWhere((c) => c.timestamp >= pointATime);
-    if (indexA < 0) return false;
-    
-    final x = indexA * params.candleWidth;
+    final x = params.fitTimestamp(pointATime);
+    if (x == null) return false;
+
     final y = params.fitPrice(pointAPrice);
     
     const handleSize = 20.0;
@@ -277,10 +272,9 @@ class FibonacciExtension extends ChartOverlay {
   bool hitTestPointB(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final indexB = params.candles.indexWhere((c) => c.timestamp >= pointBTime);
-    if (indexB < 0) return false;
-    
-    final x = indexB * params.candleWidth;
+    final x = params.fitTimestamp(pointBTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(pointBPrice);
     
     const handleSize = 20.0;
@@ -291,14 +285,45 @@ class FibonacciExtension extends ChartOverlay {
   bool hitTestPointC(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final indexC = params.candles.indexWhere((c) => c.timestamp >= pointCTime);
-    if (indexC < 0) return false;
-    
-    final x = indexC * params.candleWidth;
+    final x = params.fitTimestamp(pointCTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(pointCPrice);
     
     const handleSize = 20.0;
     return (position - Offset(x, y)).distance < handleSize;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'pointAPrice': pointAPrice,
+    'pointATime': pointATime,
+    'pointBPrice': pointBPrice,
+    'pointBTime': pointBTime,
+    'pointCPrice': pointCPrice,
+    'pointCTime': pointCTime,
+    'style': style.toJson(),
+    'options': options.toJson(),
+    'visible': visible,
+  };
+
+  factory FibonacciExtension.fromJson(Map<String, dynamic> json) {
+    return FibonacciExtension(
+      id: json['id'] as String?,
+      pointAPrice: (json['pointAPrice'] as num).toDouble(),
+      pointATime: json['pointATime'] as int,
+      pointBPrice: (json['pointBPrice'] as num).toDouble(),
+      pointBTime: json['pointBTime'] as int,
+      pointCPrice: (json['pointCPrice'] as num).toDouble(),
+      pointCTime: json['pointCTime'] as int,
+      style: json['style'] != null
+          ? FibonacciStyle.fromJson(json['style'] as Map<String, dynamic>)
+          : null,
+      options: json['options'] != null
+          ? FibonacciExtensionOptions.fromJson(json['options'] as Map<String, dynamic>)
+          : null,
+      visible: json['visible'] as bool? ?? true,
+    );
   }
 
   /// Creates a copy with updated points.

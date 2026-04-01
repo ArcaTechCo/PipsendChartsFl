@@ -118,6 +118,14 @@ class InteractiveChart extends StatefulWidget {
   /// When true, allows unlimited scrolling beyond the data boundaries.
   final bool freeCamera;
 
+  /// Number of empty candle-widths to show to the right of the last candle.
+  ///
+  /// This allows users to scroll past the last candle to see empty space,
+  /// useful for drawing tools that extend into the future (like TradingView).
+  /// Default is 0 (no extra space). A value of 50 gives roughly half a screen
+  /// of future space at default zoom.
+  final int futureCandles;
+
   /// Controller for programmatic chart interactions.
   ///
   /// Use this to control the chart programmatically (e.g., jump to latest).
@@ -160,6 +168,7 @@ class InteractiveChart extends StatefulWidget {
     this.showWatermark = true,
     this.enableInteraction = true,
     this.freeCamera = false,
+    this.futureCandles = 0,
     this.controller,
     this.initialVerticalZoom = 1.0,
     this.enableVerticalPan = false,
@@ -507,6 +516,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       setState(() {
                         _draggedOverlay = overlay;
                         _dragStartPrice = overlay.maxPrice;
+                        _dragStartPosition = details.localPosition;
                         _originalPrice = overlay.maxPrice;
                         _isResizingTop = true;
                         _isResizingBottom = false;
@@ -518,6 +528,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       setState(() {
                         _draggedOverlay = overlay;
                         _dragStartPrice = overlay.minPrice;
+                        _dragStartPosition = details.localPosition;
                         _originalPrice = overlay.minPrice;
                         _isResizingTop = false;
                         _isResizingBottom = true;
@@ -531,6 +542,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       setState(() {
                         _draggedOverlay = overlay;
                         _dragStartPrice = overlay.highPrice;
+                        _dragStartPosition = details.localPosition;
                         _originalPrice = overlay.highPrice;
                         _isResizingTop = true;
                         _isResizingBottom = false;
@@ -542,6 +554,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       setState(() {
                         _draggedOverlay = overlay;
                         _dragStartPrice = overlay.lowPrice;
+                        _dragStartPosition = details.localPosition;
                         _originalPrice = overlay.lowPrice;
                         _isResizingTop = false;
                         _isResizingBottom = true;
@@ -821,6 +834,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localPosition.dy);
                       _dragInitialPrice = params.getPriceFromY(details.localPosition.dy);
+                      _dragStartPosition = details.localPosition;
                       _hasDragged = false;
                       _isResizingTop = false;
                       _isResizingBottom = false;
@@ -841,6 +855,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
                       _draggedOverlay = tappedOverlay;
                       _dragStartPrice = params.getPriceFromY(details.localPosition.dy);
                       _dragInitialPrice = params.getPriceFromY(details.localPosition.dy);
+                      _dragStartPosition = details.localPosition;
                       _hasDragged = false;
                       _isResizingTop = false;
                       _isResizingBottom = false;
@@ -1452,7 +1467,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
   // Max start offset: how far can we scroll towards the end of the chart
   double _getMaxStartOffset(double w, double candleWidth) {
     final count = w / candleWidth; // visible candles in the window
-    final start = widget.candles.length - count;
+    final start = widget.candles.length + widget.futureCandles - count;
     return max(0, candleWidth * start);
   }
 
@@ -1513,15 +1528,27 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final dx = _tapPosition!.dx;
     final dy = _tapPosition!.dy;
     final selected = params.getCandleIndexFromOffset(dx);
-    final candle = params.candles[selected];
     final tapPrice = params.getPriceFromY(dy);
-    
-    final details = TapDetails(
-      candle: candle,
-      tapPrice: tapPrice,
-      candleIndex: selected,
-    );
-    
+    final timestamp = params.getTimestampFromX(dx);
+
+    final TapDetails details;
+    if (selected >= 0 && selected < params.candles.length) {
+      details = TapDetails(
+        candle: params.candles[selected],
+        tapPrice: tapPrice,
+        candleIndex: selected,
+        timestamp: timestamp,
+      );
+    } else {
+      // Tap in future (empty) space — no candle, extrapolated timestamp
+      details = TapDetails(
+        candle: null,
+        tapPrice: tapPrice,
+        candleIndex: -1,
+        timestamp: timestamp,
+      );
+    }
+
     widget.onTap?.call(details);
   }
 
@@ -1566,43 +1593,57 @@ class _InteractiveChartState extends State<InteractiveChart> {
     } else if (_draggedOverlay is PriceZone) {
       final priceZone = _draggedOverlay as PriceZone;
       final params = _prevParams!;
-      
+
       double newMinPrice;
       double newMaxPrice;
-      
+      int? newStartTime = priceZone.startTime;
+      int? newEndTime = priceZone.endTime;
+      final visiblePriceRange = params.maxPrice - params.minPrice;
+      final minHeight = visiblePriceRange * 0.001;
+
       if (_isResizingTop) {
-        // Resizing top edge (maxPrice)
+        // Top-left handle: maxPrice + startTime
         newMinPrice = priceZone.minPrice;
         newMaxPrice = _dragStartPrice!;
-        // Ensure minimum zone height (0.1% of visible price range)
-        final visiblePriceRange = params.maxPrice - params.minPrice;
-        final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
-        final minAllowedMaxPrice = newMinPrice + minHeight;
-        if (newMaxPrice < minAllowedMaxPrice) {
-          newMaxPrice = minAllowedMaxPrice;
+        if (newMaxPrice < newMinPrice + minHeight) {
+          newMaxPrice = newMinPrice + minHeight;
+        }
+        if (_dragStartPosition != null) {
+          newStartTime = params.getTimestampFromX(_dragStartPosition!.dx);
         }
       } else if (_isResizingBottom) {
-        // Resizing bottom edge (minPrice)
+        // Bottom-right handle: minPrice + endTime
         newMinPrice = _dragStartPrice!;
         newMaxPrice = priceZone.maxPrice;
-        // Ensure minimum zone height (0.1% of visible price range)
-        final visiblePriceRange = params.maxPrice - params.minPrice;
-        final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
-        final maxAllowedMinPrice = newMaxPrice - minHeight;
-        if (newMinPrice > maxAllowedMinPrice) {
-          newMinPrice = maxAllowedMinPrice;
+        if (newMinPrice > newMaxPrice - minHeight) {
+          newMinPrice = newMaxPrice - minHeight;
+        }
+        if (_dragStartPosition != null) {
+          newEndTime = params.getTimestampFromX(_dragStartPosition!.dx);
         }
       } else {
-        // Regular drag (move entire zone)
-        // Use initial price to calculate offset, not current price
+        // Regular drag (move entire zone) - both X and Y
         final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
         final offset = _dragStartPrice! - initialPrice;
         newMinPrice = priceZone.minPrice + offset;
         newMaxPrice = priceZone.maxPrice + offset;
+
+        if (_dragStartPosition != null && priceZone.startTime != null) {
+          final origStartX = params.fitTimestamp(priceZone.startTime!);
+          if (origStartX != null) {
+            final deltaX = _dragStartPosition!.dx - origStartX;
+            newStartTime = params.getTimestampFromX(origStartX + deltaX);
+            if (newStartTime != null && priceZone.endTime != null) {
+              final origEndX = params.fitTimestamp(priceZone.endTime!);
+              newEndTime = origEndX != null
+                  ? params.getTimestampFromX(origEndX + deltaX)
+                  : newStartTime + (priceZone.endTime! - priceZone.startTime!);
+            }
+          }
+        }
       }
-      
-      // Call the callback with the new range
-      priceZone.options.onRangeChanged?.call(newMinPrice, newMaxPrice);
+
+      priceZone.options.onRangeChanged?.call(newMinPrice, newMaxPrice, newStartTime, newEndTime);
     } else if (_draggedOverlay is FibonacciRetracement) {
       final fibonacci = _draggedOverlay as FibonacciRetracement;
       final params = _prevParams!;
@@ -1610,53 +1651,67 @@ class _InteractiveChartState extends State<InteractiveChart> {
       double newHighPrice;
       double newLowPrice;
       
+      int? newStartTime = fibonacci.startTime;
+      int? newEndTime = fibonacci.endTime;
+
       if (_isResizingFibonacci) {
-        // Resizing one edge of the Fibonacci
+        // Resizing a corner handle
+        final visiblePriceRange = params.maxPrice - params.minPrice;
+        final minHeight = visiblePriceRange * 0.001;
+
         if (_isResizingTop) {
-          // Resizing top edge (highPrice)
+          // Top-left handle: controls highPrice + startTime
           newHighPrice = _dragStartPrice!;
           newLowPrice = fibonacci.lowPrice;
-          // Ensure minimum height (0.1% of visible price range)
-          final visiblePriceRange = params.maxPrice - params.minPrice;
-          final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
-          final minAllowedHighPrice = newLowPrice + minHeight;
-          if (newHighPrice < minAllowedHighPrice) {
-            newHighPrice = minAllowedHighPrice;
+          if (newHighPrice < newLowPrice + minHeight) {
+            newHighPrice = newLowPrice + minHeight;
+          }
+          if (_dragStartPosition != null) {
+            newStartTime = params.getTimestampFromX(_dragStartPosition!.dx);
           }
         } else {
-          // Resizing bottom edge (lowPrice)
+          // Bottom-right handle: controls lowPrice + endTime
           newHighPrice = fibonacci.highPrice;
           newLowPrice = _dragStartPrice!;
-          // Ensure minimum height (0.1% of visible price range)
-          final visiblePriceRange = params.maxPrice - params.minPrice;
-          final minHeight = visiblePriceRange * 0.001; // 0.1% of visible range
-          final maxAllowedLowPrice = newHighPrice - minHeight;
-          if (newLowPrice > maxAllowedLowPrice) {
-            newLowPrice = maxAllowedLowPrice;
+          if (newLowPrice > newHighPrice - minHeight) {
+            newLowPrice = newHighPrice - minHeight;
+          }
+          if (_dragStartPosition != null) {
+            newEndTime = params.getTimestampFromX(_dragStartPosition!.dx);
           }
         }
       } else {
-        // Regular drag (move entire Fibonacci)
-        // Use initial price to calculate offset, not current price
+        // Regular drag (move entire Fibonacci) - both X and Y
         final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
         final offset = _dragStartPrice! - initialPrice;
         newHighPrice = fibonacci.highPrice + offset;
         newLowPrice = fibonacci.lowPrice + offset;
+
+        if (_dragStartPosition != null && fibonacci.startTime != null) {
+          final origStartX = params.fitTimestamp(fibonacci.startTime!);
+          if (origStartX != null) {
+            final deltaX = _dragStartPosition!.dx - origStartX;
+            newStartTime = params.getTimestampFromX(origStartX + deltaX);
+            if (newStartTime != null && fibonacci.endTime != null) {
+              final origEndX = params.fitTimestamp(fibonacci.endTime!);
+              newEndTime = origEndX != null
+                  ? params.getTimestampFromX(origEndX + deltaX)
+                  : newStartTime + (fibonacci.endTime! - fibonacci.startTime!);
+            }
+          }
+        }
       }
-      
-      // Call the callback with the new prices
-      fibonacci.options.onMoved?.call(newHighPrice, newLowPrice);
+
+      fibonacci.options.onMoved?.call(newHighPrice, newLowPrice, newStartTime, newEndTime);
     } else if (_draggedOverlay is TrendLine) {
       final trendLine = _draggedOverlay as TrendLine;
       final params = _prevParams!;
       
       if (_isResizingTrendLine && _dragStartPosition != null) {
         // Resizing one endpoint - calculate new timestamp from X position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         if (_isResizingTrendStart) {
           // Resizing start point
           trendLine.options.onMoved?.call(
@@ -1679,23 +1734,20 @@ class _InteractiveChartState extends State<InteractiveChart> {
         // Use initial price to calculate offset, not current price
         final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
         final priceOffset = _dragStartPrice! - initialPrice;
-        
-        // Calculate time offset based on X movement
-        final startIndex = params.candles.indexWhere((c) => c.timestamp >= trendLine.startTime);
-        if (startIndex >= 0) {
-          final startX = params.xShift + startIndex * params.candleWidth;
+
+        // Calculate time offset based on X movement using extrapolated timestamps
+        final startX = params.fitTimestamp(trendLine.startTime);
+        if (startX != null) {
           final deltaX = _dragStartPosition!.dx - startX;
-          final candleOffset = (deltaX / params.candleWidth).round();
-          
-          // Find new timestamps
-          final newStartIndex = (startIndex + candleOffset).clamp(0, params.candles.length - 1);
-          final endIndex = params.candles.indexWhere((c) => c.timestamp >= trendLine.endTime);
-          final newEndIndex = endIndex >= 0 ? (endIndex + candleOffset).clamp(0, params.candles.length - 1) : newStartIndex;
-          
+
+          final newStartTimestamp = params.getTimestampFromX(startX + deltaX);
+          final endX = params.fitTimestamp(trendLine.endTime);
+          final newEndTimestamp = endX != null ? params.getTimestampFromX(endX + deltaX) : newStartTimestamp;
+
           trendLine.options.onMoved?.call(
-            params.candles[newStartIndex].timestamp,
+            newStartTimestamp ?? trendLine.startTime,
             trendLine.startPrice + priceOffset,
-            params.candles[newEndIndex].timestamp,
+            newEndTimestamp ?? trendLine.endTime,
             trendLine.endPrice + priceOffset,
           );
         }
@@ -1735,11 +1787,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_isResizingTrendLine && _dragStartPosition != null) {
         // Resizing one endpoint - calculate new timestamp from X position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         if (_isResizingTrendStart) {
           // Resizing start point
           rulerTool.options.onMoved?.call(
@@ -1762,23 +1812,20 @@ class _InteractiveChartState extends State<InteractiveChart> {
         // Use initial price to calculate offset, not current price
         final initialPrice = _dragInitialPrice ?? _dragStartPrice!;
         final priceOffset = _dragStartPrice! - initialPrice;
-        
-        // Calculate time offset based on X movement
-        final startIndex = params.candles.indexWhere((c) => c.timestamp >= rulerTool.startTime);
-        if (startIndex >= 0) {
-          final startX = params.xShift + startIndex * params.candleWidth;
+
+        // Calculate time offset based on X movement using extrapolated timestamps
+        final startX = params.fitTimestamp(rulerTool.startTime);
+        if (startX != null) {
           final deltaX = _dragStartPosition!.dx - startX;
-          final candleOffset = (deltaX / params.candleWidth).round();
-          
-          // Find new timestamps
-          final newStartIndex = (startIndex + candleOffset).clamp(0, params.candles.length - 1);
-          final endIndex = params.candles.indexWhere((c) => c.timestamp >= rulerTool.endTime);
-          final newEndIndex = endIndex >= 0 ? (endIndex + candleOffset).clamp(0, params.candles.length - 1) : newStartIndex;
-          
+
+          final newStartTimestamp = params.getTimestampFromX(startX + deltaX);
+          final endX = params.fitTimestamp(rulerTool.endTime);
+          final newEndTimestamp = endX != null ? params.getTimestampFromX(endX + deltaX) : newStartTimestamp;
+
           rulerTool.options.onMoved?.call(
-            params.candles[newStartIndex].timestamp,
+            newStartTimestamp ?? rulerTool.startTime,
             rulerTool.startPrice + priceOffset,
-            params.candles[newEndIndex].timestamp,
+            newEndTimestamp ?? rulerTool.endTime,
             rulerTool.endPrice + priceOffset,
           );
         }
@@ -1790,10 +1837,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _isDraggingVerticalLine) {
         // Calculate new timestamp from X position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
-        
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
+
         verticalLine.options.onMoved?.call(newTimestamp);
       }
     } else if (_draggedOverlay is FibonacciExtension) {
@@ -1803,11 +1848,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _dragStartPrice != null) {
         // Calculate new timestamp and price from position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         // Determine which point was dragged and update
         if (_isResizingFibExtPointA) {
           fibExt.options.onMoved?.call(
@@ -1845,11 +1888,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _dragStartPrice != null) {
         // Calculate new timestamp and price from position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         // Determine which point was dragged and update
         if (_isResizingFibFanStart) {
           fibFan.options.onMoved?.call(
@@ -1874,11 +1915,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _dragStartPrice != null) {
         // Calculate new timestamp and price from position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         // Determine which point was dragged and update
         if (_isResizingArrowStart) {
           arrow.options.onMoved?.call(
@@ -1903,11 +1942,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _dragStartPrice != null) {
         // Calculate new timestamp and price from position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         if (_isResizingCircleCenter) {
           // Moving center - keep radius the same
           circle.options.onMoved?.call(
@@ -1936,11 +1973,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _dragStartPrice != null) {
         // Calculate new timestamp and price from position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         textTool.options.onMoved?.call(newTimestamp, newPrice);
       }
     } else if (_draggedOverlay is GanttTool) {
@@ -1950,11 +1985,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
       
       if (_dragStartPosition != null && _dragStartPrice != null) {
         // Calculate new timestamp and price from position
-        final candleIndex = params.getCandleIndexFromOffset(_dragStartPosition!.dx);
-        final clampedIndex = candleIndex.clamp(0, params.candles.length - 1);
-        final newTimestamp = params.candles[clampedIndex].timestamp;
+        final newTimestamp = params.getTimestampFromX(_dragStartPosition!.dx) ?? params.candles.last.timestamp;
         final newPrice = _dragStartPrice!;
-        
+
         if (_isResizingGanttStart) {
           // Resizing start - keep end the same
           gantt.options.onMoved?.call(

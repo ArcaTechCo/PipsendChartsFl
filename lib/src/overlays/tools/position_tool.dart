@@ -331,6 +331,60 @@ class PositionTool extends ChartOverlay {
     return (position.dy - y).abs() < hitTolerance;
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'entryPrice': entryPrice,
+    'stopLossPrice': stopLossPrice,
+    'takeProfitPrice': takeProfitPrice,
+    'style': {
+      'entryColor': style.entryColor.value,
+      'stopLossColor': style.stopLossColor.value,
+      'takeProfitColor': style.takeProfitColor.value,
+      'lineWidth': style.lineWidth,
+      'labelTextColor': style.labelTextColor.value,
+      'labelBackgroundColor': style.labelBackgroundColor.value,
+      'profitZoneColor': style.profitZoneColor.value,
+      'riskZoneColor': style.riskZoneColor.value,
+    },
+    'options': {
+      'showLabels': options.showLabels,
+      'showPriceInLabel': options.showPriceInLabel,
+      'showRiskReward': options.showRiskReward,
+      'showPositionZone': options.showPositionZone,
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory PositionTool.fromJson(Map<String, dynamic> json) {
+    final s = json['style'] as Map<String, dynamic>?;
+    final o = json['options'] as Map<String, dynamic>?;
+    return PositionTool(
+      id: json['id'] as String?,
+      entryPrice: (json['entryPrice'] as num).toDouble(),
+      stopLossPrice: (json['stopLossPrice'] as num).toDouble(),
+      takeProfitPrice: (json['takeProfitPrice'] as num).toDouble(),
+      style: s != null ? PositionToolStyle(
+        entryColor: Color(s['entryColor'] as int),
+        stopLossColor: Color(s['stopLossColor'] as int),
+        takeProfitColor: Color(s['takeProfitColor'] as int),
+        lineWidth: (s['lineWidth'] as num?)?.toDouble() ?? 2.0,
+        labelTextColor: s['labelTextColor'] != null ? Color(s['labelTextColor'] as int) : const Color(0xFFFFFFFF),
+        labelBackgroundColor: s['labelBackgroundColor'] != null ? Color(s['labelBackgroundColor'] as int) : const Color(0xCC000000),
+        profitZoneColor: s['profitZoneColor'] != null ? Color(s['profitZoneColor'] as int) : const Color(0x0A4CAF50),
+        riskZoneColor: s['riskZoneColor'] != null ? Color(s['riskZoneColor'] as int) : const Color(0x0AF44336),
+      ) : null,
+      options: o != null ? PositionToolOptions(
+        showLabels: o['showLabels'] as bool? ?? true,
+        showPriceInLabel: o['showPriceInLabel'] as bool? ?? true,
+        showRiskReward: o['showRiskReward'] as bool? ?? true,
+        showPositionZone: o['showPositionZone'] as bool? ?? false,
+        draggable: o['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
+    );
+  }
+
   /// Creates a copy with updated prices.
   PositionTool copyWith({
     double? entryPrice,

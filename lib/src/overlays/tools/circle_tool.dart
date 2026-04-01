@@ -59,19 +59,14 @@ class CircleTool extends ChartOverlay {
     if (!visible) return;
     
     // Find center point
-    final centerIndex = params.candles.indexWhere((c) => c.timestamp >= centerTime);
-    if (centerIndex < 0) return;
-    
-    final centerX = centerIndex * params.candleWidth;
+    final centerX = params.fitTimestamp(centerTime);
+    if (centerX == null) return;
+
     final centerY = params.fitPrice(centerPrice);
-    
+
     // Calculate radius in pixels
-    // For time: find how many candles represent the radius
-    final endTime = centerTime + radiusTime;
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    final radiusX = endIndex >= 0 
-        ? (endIndex - centerIndex) * params.candleWidth 
-        : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth; // Estimate if not found
+    final edgeX = params.fitTimestamp(centerTime + radiusTime);
+    final radiusX = edgeX != null ? (edgeX - centerX).abs() : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth;
     
     // For price: convert price difference to pixels
     final topPrice = centerPrice + radiusPrice;
@@ -147,18 +142,14 @@ class CircleTool extends ChartOverlay {
     if (!interactive) return false;
     
     // Find center point
-    final centerIndex = params.candles.indexWhere((c) => c.timestamp >= centerTime);
-    if (centerIndex < 0) return false;
-    
-    final centerX = centerIndex * params.candleWidth;
+    final centerX = params.fitTimestamp(centerTime);
+    if (centerX == null) return false;
+
     final centerY = params.fitPrice(centerPrice);
-    
+
     // Calculate radius in pixels
-    final endTime = centerTime + radiusTime;
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    final radiusX = endIndex >= 0 
-        ? (endIndex - centerIndex) * params.candleWidth 
-        : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth;
+    final edgeX = params.fitTimestamp(centerTime + radiusTime);
+    final radiusX = edgeX != null ? (edgeX - centerX).abs() : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth;
     
     final topPrice = centerPrice + radiusPrice;
     final bottomPrice = centerPrice - radiusPrice;
@@ -180,10 +171,9 @@ class CircleTool extends ChartOverlay {
   bool hitTestCenterHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final centerIndex = params.candles.indexWhere((c) => c.timestamp >= centerTime);
-    if (centerIndex < 0) return false;
-    
-    final x = centerIndex * params.candleWidth;
+    final x = params.fitTimestamp(centerTime);
+    if (x == null) return false;
+
     final y = params.fitPrice(centerPrice);
     
     const handleSize = 20.0;
@@ -194,24 +184,62 @@ class CircleTool extends ChartOverlay {
   bool hitTestRadiusHandle(Offset position, PainterParams params) {
     if (!options.draggable) return false;
     
-    final centerIndex = params.candles.indexWhere((c) => c.timestamp >= centerTime);
-    if (centerIndex < 0) return false;
-    
-    final centerX = centerIndex * params.candleWidth;
+    final centerX = params.fitTimestamp(centerTime);
+    if (centerX == null) return false;
+
     final centerY = params.fitPrice(centerPrice);
-    
+
     // Calculate radius handle position (right edge)
-    final endTime = centerTime + radiusTime;
-    final endIndex = params.candles.indexWhere((c) => c.timestamp >= endTime);
-    final radiusX = endIndex >= 0 
-        ? (endIndex - centerIndex) * params.candleWidth 
-        : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth;
-    
+    final edgeX = params.fitTimestamp(centerTime + radiusTime);
+    final radiusX = edgeX != null ? (edgeX - centerX).abs() : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth;
+
     final x = centerX + radiusX;
     final y = centerY;
     
     const handleSize = 20.0;
     return (position - Offset(x, y)).distance < handleSize;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'centerTime': centerTime,
+    'centerPrice': centerPrice,
+    'radiusTime': radiusTime,
+    'radiusPrice': radiusPrice,
+    'style': {
+      'color': style.color.value,
+      'strokeWidth': style.strokeWidth,
+      'filled': style.filled,
+      'fillColor': style.fillColor.value,
+      'fillOpacity': style.fillOpacity,
+    },
+    'options': {
+      'draggable': options.draggable,
+    },
+    'visible': visible,
+  };
+
+  factory CircleTool.fromJson(Map<String, dynamic> json) {
+    final s = json['style'] as Map<String, dynamic>?;
+    final o = json['options'] as Map<String, dynamic>?;
+    return CircleTool(
+      id: json['id'] as String?,
+      centerTime: json['centerTime'] as int,
+      centerPrice: (json['centerPrice'] as num).toDouble(),
+      radiusTime: json['radiusTime'] as int,
+      radiusPrice: (json['radiusPrice'] as num).toDouble(),
+      style: s != null ? CircleToolStyle(
+        color: Color(s['color'] as int),
+        strokeWidth: (s['strokeWidth'] as num?)?.toDouble() ?? 2.0,
+        filled: s['filled'] as bool? ?? false,
+        fillColor: s['fillColor'] != null ? Color(s['fillColor'] as int) : const Color(0xFF2196F3),
+        fillOpacity: (s['fillOpacity'] as num?)?.toDouble() ?? 0.2,
+      ) : null,
+      options: o != null ? CircleToolOptions(
+        draggable: o['draggable'] as bool? ?? true,
+      ) : null,
+      visible: json['visible'] as bool? ?? true,
+    );
   }
 
   /// Creates a copy with updated properties.

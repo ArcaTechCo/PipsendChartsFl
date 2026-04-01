@@ -27,6 +27,18 @@ class FibonacciFanOptions {
     this.onDelete,
   });
 
+  Map<String, dynamic> toJson() => {
+    'draggable': draggable,
+    'showLabels': showLabels,
+  };
+
+  factory FibonacciFanOptions.fromJson(Map<String, dynamic> json) {
+    return FibonacciFanOptions(
+      draggable: json['draggable'] as bool? ?? true,
+      showLabels: json['showLabels'] as bool? ?? true,
+    );
+  }
+
   FibonacciFanOptions copyWith({
     bool? draggable,
     bool? showLabels,

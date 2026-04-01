@@ -21,6 +21,30 @@ class TrendLineStyle {
     this.labelStyle,
   });
 
+  Map<String, dynamic> toJson() => {
+    'color': color.value,
+    'lineWidth': lineWidth,
+    'dashPattern': dashPattern,
+    if (labelStyle != null) 'labelStyle': {
+      'color': labelStyle!.color?.value,
+      'fontSize': labelStyle!.fontSize,
+      'fontWeight': labelStyle!.fontWeight?.index,
+    },
+  };
+
+  factory TrendLineStyle.fromJson(Map<String, dynamic> json) {
+    return TrendLineStyle(
+      color: json['color'] != null ? Color(json['color'] as int) : const Color(0xFF2196F3),
+      lineWidth: (json['lineWidth'] as num?)?.toDouble() ?? 2.0,
+      dashPattern: (json['dashPattern'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? const [],
+      labelStyle: json['labelStyle'] != null ? TextStyle(
+        color: json['labelStyle']['color'] != null ? Color(json['labelStyle']['color'] as int) : null,
+        fontSize: (json['labelStyle']['fontSize'] as num?)?.toDouble(),
+        fontWeight: json['labelStyle']['fontWeight'] != null ? FontWeight.values[json['labelStyle']['fontWeight'] as int] : null,
+      ) : null,
+    );
+  }
+
   TrendLineStyle copyWith({
     Color? color,
     double? lineWidth,

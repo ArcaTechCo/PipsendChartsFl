@@ -204,18 +204,18 @@ class TradingLine extends chart_overlay.ChartOverlay {
   }
 
   Offset _getLabelOffset(TextPainter tp, double y, PainterParams params) {
-    // Position above the line with a small gap (2px instead of 4px)
-    final verticalOffset = y - tp.height - 2;
+    final verticalOffset = y - tp.height - style.labelVerticalPadding;
+    final hPadding = style.labelHorizontalPadding;
 
     switch (options.labelPosition) {
       case LabelPosition.left:
-        return Offset(4, verticalOffset);
+        return Offset(hPadding, verticalOffset);
       case LabelPosition.right:
-        return Offset(params.chartWidth - tp.width - 4, verticalOffset);
+        return Offset(params.chartWidth - tp.width - hPadding, verticalOffset);
       case LabelPosition.center:
         return Offset((params.chartWidth - tp.width) / 2, verticalOffset);
       case LabelPosition.custom:
-        return options.customLabelOffset ?? Offset(4, verticalOffset);
+        return options.customLabelOffset ?? Offset(hPadding, verticalOffset);
     }
   }
 
@@ -298,6 +298,37 @@ class TradingLine extends chart_overlay.ChartOverlay {
       visible: visible ?? this.visible,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'price': price,
+    'type': type.name,
+    'style': style.toJson(),
+    'options': options.toJson(),
+    'visible': visible,
+    if (startTime != null) 'startTime': startTime,
+    if (endTime != null) 'endTime': endTime,
+  };
+
+  factory TradingLine.fromJson(Map<String, dynamic> json) {
+    return TradingLine(
+      id: json['id'] as String?,
+      price: (json['price'] as num).toDouble(),
+      type: TradingLineType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => TradingLineType.custom,
+      ),
+      style: json['style'] != null
+          ? TradingLineStyle.fromJson(json['style'] as Map<String, dynamic>)
+          : null,
+      options: json['options'] != null
+          ? TradingLineOptions.fromJson(json['options'] as Map<String, dynamic>)
+          : null,
+      visible: json['visible'] as bool? ?? true,
+      startTime: json['startTime'] as int?,
+      endTime: json['endTime'] as int?,
     );
   }
 

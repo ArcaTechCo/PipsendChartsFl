@@ -80,6 +80,9 @@ export 'src/overlays/trend_line_options.dart';
 export 'src/overlays/trend_line_manager.dart';
 export 'src/overlays/trend_line_event.dart';
 
+// Chart Drawing Manager
+export 'src/overlays/chart_drawing_manager.dart';
+
 // Drawing Tools
 export 'src/overlays/tools/position_tool.dart';
 export 'src/overlays/tools/ruler_tool.dart';
