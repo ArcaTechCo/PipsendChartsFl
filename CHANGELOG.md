@@ -1,3 +1,22 @@
+## 1.3.0
+
+**Persistent Crosshair, Dashed Style & Tap-to-Select on Non-Draggable Lines**
+
+### New Features
+* **`InteractiveChart.persistentCrosshair`** — when `true`, the crosshair (tap highlight + price line + OHLC info) stays visible after the user lifts their finger, until they tap somewhere else or the flag is toggled off. Default: `false` (legacy behavior — crosshair disappears on tap-up).
+* **`ChartStyle.crosshairDashed`** — when `true`, renders the crosshair as thin dashed lines on both axes (TradingView-style) instead of the wide vertical highlight bar plus solid horizontal price line. Default: `false`.
+
+### Improvements
+* **`TradingLine` hit testing** — non-draggable lines that supply an `onTap` callback now participate in hit testing. Previously, only `draggable: true` lines were interactive, so entry lines (typically non-draggable) couldn't be selected by tapping. Now any line with either `draggable` or `onTap` is hit-tested.
+
+### Bug Fixes
+* Removed stray `print('$id: not interactive')` from `TradingLine.hitTest`.
+
+### Backwards Compatibility
+* All changes are additive. Existing code continues to work without modification.
+
+---
+
 ## 1.2.0
 
 **Serialization, Sync API & Free Movement for All Drawing Tools**

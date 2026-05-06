@@ -69,6 +69,14 @@ class ChartStyle {
   /// The highlight color. This appears when user clicks on the chart.
   final Color selectionHighlightColor;
 
+  /// Whether to render the crosshair (tap highlight) as thin dashed lines instead of
+  /// a solid vertical highlight bar plus a solid horizontal line.
+  ///
+  /// When false (default), the crosshair shows a wide vertical bar over the selected
+  /// candle and a solid horizontal price line.
+  /// When true, both axes render as thin dashed lines (TradingView-style crosshair).
+  final bool crosshairDashed;
+
   /// The background color of the overlay.
   ///
   /// This appears when user clicks on the chart.
@@ -135,6 +143,7 @@ class ChartStyle {
     @Deprecated('Use gridStyle.horizontalGridColor instead')
     this.priceGridLineColor,
     this.selectionHighlightColor = const Color(0x33757575),
+    this.crosshairDashed = false,
     this.overlayBackgroundColor = const Color(0xEE757575),
     this.candleBorderRadius = 0.0,
     this.adaptiveLabels = true,

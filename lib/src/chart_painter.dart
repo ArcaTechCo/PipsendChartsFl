@@ -909,28 +909,58 @@ class ChartPainter extends CustomPainter {
     final pos = params.tapPosition!;
     final i = params.getCandleIndexFromOffset(pos.dx);
     final candle = params.candles[i];
+    final dashed = params.style.crosshairDashed;
     canvas.save();
     canvas.translate(params.xShift, 0.0);
-    // Draw highlight bar (selection box)
-    canvas.drawLine(
-        Offset(i * params.candleWidth, 0.0),
-        Offset(i * params.candleWidth, params.chartHeight),
-        Paint()
-          ..strokeWidth = max(params.candleWidth * 0.88, 1.0)
-          ..color = params.style.selectionHighlightColor);
+    if (dashed) {
+      // Thin dashed vertical line through the center of the selected candle
+      final centerX = i * params.candleWidth + params.candleWidth / 2;
+      final paint = Paint()
+        ..strokeWidth = 1.0
+        ..color = params.style.selectionHighlightColor.withValues(alpha: 0.8)
+        ..style = PaintingStyle.stroke;
+      _drawDashedLine(
+        canvas,
+        Offset(centerX, 0.0),
+        Offset(centerX, params.chartHeight),
+        paint,
+        dashLength: 5,
+        gapLength: 3,
+      );
+    } else {
+      // Draw highlight bar (selection box)
+      canvas.drawLine(
+          Offset(i * params.candleWidth, 0.0),
+          Offset(i * params.candleWidth, params.chartHeight),
+          Paint()
+            ..strokeWidth = max(params.candleWidth * 0.88, 1.0)
+            ..color = params.style.selectionHighlightColor);
+    }
     canvas.restore();
-    
+
     // Draw horizontal price line at tap position
     if (params.tapPrice != null) {
       final priceY = params.fitPrice(params.tapPrice!);
-      canvas.drawLine(
-        Offset(0, priceY),
-        Offset(params.chartWidth, priceY),
-        Paint()
-          ..strokeWidth = 1.0
-          ..color = params.style.selectionHighlightColor.withValues(alpha: 0.8)
-          ..style = PaintingStyle.stroke,
-      );
+      final paint = Paint()
+        ..strokeWidth = 1.0
+        ..color = params.style.selectionHighlightColor.withValues(alpha: 0.8)
+        ..style = PaintingStyle.stroke;
+      if (dashed) {
+        _drawDashedLine(
+          canvas,
+          Offset(0, priceY),
+          Offset(params.chartWidth, priceY),
+          paint,
+          dashLength: 5,
+          gapLength: 3,
+        );
+      } else {
+        canvas.drawLine(
+          Offset(0, priceY),
+          Offset(params.chartWidth, priceY),
+          paint,
+        );
+      }
       
       // Draw price label on the right
       final priceText = getPriceLabel(params.tapPrice!);

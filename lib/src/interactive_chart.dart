@@ -152,6 +152,16 @@ class InteractiveChart extends StatefulWidget {
   /// This is useful when you need space for TP/SL lines or indicators outside the candle range.
   final bool enableVerticalPan;
 
+  /// Whether to keep the crosshair (tap highlight + price line + OHLC info) visible after the user lifts their finger.
+  ///
+  /// When false (default), the crosshair only shows while the user is pressing on the chart,
+  /// and disappears on tap-up.
+  /// When true, the crosshair stays visible until the user taps somewhere else (which moves it)
+  /// or this flag is toggled off.
+  ///
+  /// Requires [enableInteraction] to be true.
+  final bool persistentCrosshair;
+
   const InteractiveChart({
     Key? key,
     required this.candles,
@@ -172,6 +182,7 @@ class InteractiveChart extends StatefulWidget {
     this.controller,
     this.initialVerticalZoom = 1.0,
     this.enableVerticalPan = false,
+    this.persistentCrosshair = false,
   })  : this.style = style ?? const ChartStyle(),
         assert(candles.length >= 3,
             "InteractiveChart requires 3 or more CandleData"),
@@ -259,10 +270,33 @@ class _InteractiveChartState extends State<InteractiveChart> {
   }
 
   @override
+  void didUpdateWidget(InteractiveChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If persistent crosshair was toggled off, clear the tap position so the crosshair disappears.
+    if (oldWidget.persistentCrosshair && !widget.persistentCrosshair && _tapPosition != null) {
+      setState(() {
+        _tapPosition = null;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     // Detach controller
     widget.controller?.detach();
     super.dispose();
+  }
+
+  /// Fire the [TradingLineOptions.onTap] callback when the user tapped a trading line
+  /// without dragging it (or with an insignificant drag).
+  ///
+  /// Called from [GestureDetector.onTapUp] and [GestureDetector.onScaleEnd] when
+  /// `_draggedOverlay` is set but the gesture didn't qualify as a drag.
+  void _maybeFireOverlayTap() {
+    final overlay = _draggedOverlay;
+    if (overlay is TradingLine) {
+      overlay.options.onTap?.call();
+    }
   }
 
   /// Jump to the latest candle (most recent data)
@@ -507,6 +541,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
           child: GestureDetector(
             // Tap to view candle details or select overlay
             onTapDown: (details) {
+              // Crosshair mode: skip all overlay interactions, just place the crosshair.
+              if (widget.persistentCrosshair) {
+                setState(() {
+                  _tapPosition = details.localPosition;
+                });
+                return;
+              }
               final params = _prevParams;
               if (params != null) {
                 // FIRST: Check all zones and fibonacci for handle hits
@@ -886,8 +927,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
               }
             },
             onTapUp: (_) {
-              // If overlay was selected but not dragged, deselect it
+              // Crosshair mode: keep the crosshair where the user placed it.
+              if (widget.persistentCrosshair) {
+                return;
+              }
+              // If overlay was selected but not dragged, fire its onTap callback and deselect it
               if (_draggedOverlay != null && !_hasDragged) {
+                _maybeFireOverlayTap();
                 setState(() {
                   _draggedOverlay = null;
                   _dragStartPrice = null;
@@ -898,8 +944,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
               } else if (_draggedOverlay == null && widget.onTap != null) {
                 _fireOnTapEvent();
               }
-              // Clear tap position if interaction is enabled
-              if (widget.enableInteraction) {
+              // Clear tap position if interaction is enabled, unless the crosshair should persist.
+              if (widget.enableInteraction && !widget.persistentCrosshair) {
                 setState(() {
                   _tapPosition = null;
                 });
@@ -907,6 +953,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
             },
             // Scale for both zoom and overlay dragging
             onScaleStart: (details) {
+              // Crosshair mode: track the finger as the crosshair position; skip zoom/pan/overlay drag.
+              if (widget.persistentCrosshair) {
+                setState(() {
+                  _tapPosition = details.localFocalPoint;
+                });
+                return;
+              }
               final params = _prevParams;
               if (params != null) {
                 // FIRST: Check all zones and fibonacci for handle hits
@@ -1258,6 +1311,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
               _onScaleStart(details.localFocalPoint);
             },
             onScaleUpdate: (details) {
+              // Crosshair mode: move the crosshair with the finger.
+              if (widget.persistentCrosshair) {
+                setState(() {
+                  _tapPosition = details.localFocalPoint;
+                });
+                return;
+              }
               if (_draggedOverlay != null) {
                 // Dragging an overlay
                 _hasDragged = true; // Mark that user has dragged
@@ -1268,6 +1328,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
               }
             },
             onScaleEnd: (details) {
+              // Crosshair mode: keep the crosshair at its last position.
+              if (widget.persistentCrosshair) {
+                return;
+              }
               if (_draggedOverlay != null) {
                 // Call drag end if user actually dragged
                 if (_hasDragged && _dragStartPrice != null) {
@@ -1327,6 +1391,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
                     return; // _onOverlayDragEnd already calls setState
                   }
                 }
+                // Reaching here means an overlay was selected but the gesture didn't
+                // qualify as a drag (no movement, or insignificant TradingLine move).
+                // Treat it as a tap and fire the overlay's onTap callback.
+                _maybeFireOverlayTap();
               }
               // Only clear state if we didn't call _onOverlayDragEnd
               setState(() {

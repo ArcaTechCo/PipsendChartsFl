@@ -62,7 +62,11 @@ class TradingLine extends chart_overlay.ChartOverlay {
         this.options = options ?? const TradingLineOptions(),
         super(
           id: id ?? '${type.name}_${price.toStringAsFixed(2)}',
-          interactive: (options ?? const TradingLineOptions()).draggable,
+          // A line is interactive if the user can drag it OR tap it. Non-draggable
+          // lines that supply an `onTap` callback (e.g. entry lines used to select
+          // a position on the chart) need to participate in hit testing too.
+          interactive: (options ?? const TradingLineOptions()).draggable ||
+              (options ?? const TradingLineOptions()).onTap != null,
           visible: visible,
         );
 
@@ -246,10 +250,7 @@ class TradingLine extends chart_overlay.ChartOverlay {
 
   @override
   bool hitTest(Offset position, PainterParams params) {
-    if (!interactive) {
-      print('$id: not interactive');
-      return false;
-    }
+    if (!interactive) return false;
 
     final y = params.fitPrice(price);
     
