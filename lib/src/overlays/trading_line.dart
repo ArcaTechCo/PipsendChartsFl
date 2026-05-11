@@ -253,16 +253,60 @@ class TradingLine extends chart_overlay.ChartOverlay {
     if (!interactive) return false;
 
     final y = params.fitPrice(price);
-    
-    // Expanded hit area: includes the label above the line
-    // Label is positioned 2px above the line, with typical height of ~16px
-    final hitAreaAbove = 20.0; // Includes label area
-    final hitAreaBelow = 10.0; // Below the line
 
-    final isHit = (position.dy >= y - hitAreaAbove && position.dy <= y + hitAreaBelow) &&
-           (position.dx >= 0 && position.dx <= params.chartWidth);
-    
-    return isHit;
+    // The hit area is split in three zones so the user can comfortably
+    // tap on the visible labels without claiming the whole horizontal
+    // strip (which previously caused accidental drags during pan/zoom):
+    //
+    //   1. Title text rect on the chart area (where the host renders
+    //      e.g. "BUY LIMIT 0.1"). Padded for finger-sized touches.
+    //   2. Price label rect in the right-side gutter (always rendered
+    //      at x = chartWidth + 4).
+    //   3. A thin ±5 px strip along the line itself across the chart,
+    //      to support drag handles without bleeding into pan gestures.
+
+    // Zone 1 — title text.
+    final titleText = options.title ?? type.defaultTitle;
+    if (titleText.isNotEmpty || options.customText != null) {
+      final combinedText = options.customText != null
+          ? '$titleText ${options.customText}'
+          : titleText;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: combinedText,
+          style: TextStyle(
+            fontSize: style.labelFontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final labelOffset = _getLabelOffset(tp, y, params);
+      // 8 px padding around the text gives a comfortable touch target
+      // without being so big it covers a chunk of the chart.
+      final titleRect = Rect.fromLTWH(
+        labelOffset.dx - 8,
+        labelOffset.dy - 4,
+        tp.width + 16,
+        tp.height + 8,
+      );
+      if (titleRect.contains(position)) return true;
+    }
+
+    // Zone 2 — price gutter on the right.
+    if (position.dx >= params.chartWidth - 4 &&
+        position.dx <= params.chartWidth + 80 &&
+        position.dy >= y - 12 &&
+        position.dy <= y + 12) {
+      return true;
+    }
+
+    // Zone 3 — thin line strip across the drawable chart area.
+    const lineHitHalfHeight = 5.0;
+    return position.dy >= y - lineHitHalfHeight &&
+        position.dy <= y + lineHitHalfHeight &&
+        position.dx >= 0 &&
+        position.dx <= params.chartWidth;
   }
 
   /// Creates a copy of this trading line with a new price.

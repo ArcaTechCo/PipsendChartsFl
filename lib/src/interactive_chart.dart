@@ -26,6 +26,8 @@ import 'overlays/tools/arrow_tool.dart';
 import 'overlays/tools/circle_tool.dart';
 import 'overlays/tools/text_tool.dart';
 import 'overlays/tools/gantt_tool.dart';
+import 'overlays/playhead_style.dart';
+import 'overlays/playhead_info.dart';
 import 'indicators/indicator.dart';
 
 class InteractiveChart extends StatefulWidget {
@@ -162,6 +164,38 @@ class InteractiveChart extends StatefulWidget {
   /// Requires [enableInteraction] to be true.
   final bool persistentCrosshair;
 
+  /// Absolute index into [candles] of the replay playhead. When null
+  /// the chart behaves normally (no replay).
+  ///
+  /// When non-null:
+  ///   * Candles beyond this index are not drawn (rendering stops at
+  ///     the playhead).
+  ///   * Indicators still calculate over the full [candles] list, so
+  ///     their cache stays stable across playhead moves.
+  ///   * The visible range and `onXOffsetChanged.totalCandles` use
+  ///     `playheadIndex + 1` as the effective length.
+  ///
+  /// Must satisfy `0 <= playheadIndex < candles.length`.
+  final int? playheadIndex;
+
+  /// Sub-candle progress in `[0.0, 1.0]` used by tick-replay mode.
+  ///
+  /// When set together with [playheadIndex], the candle at the
+  /// playhead position is replaced (visually only) by a partial
+  /// candle interpolated via [CandleData.buildPartial]. The
+  /// interpolation animates smoothly thanks to the painter tween.
+  final double? playheadTickProgress;
+
+  /// Visual style for the built-in playhead line. When null the
+  /// chart does not draw a playhead automatically — useful if the
+  /// host prefers to render its own as a regular overlay.
+  final PlayheadStyle? playheadStyle;
+
+  /// Fired when the user drags the built-in playhead. Only invoked
+  /// when both [playheadIndex] and [playheadStyle] are non-null and
+  /// [PlayheadStyle.draggable] is true.
+  final ValueChanged<PlayheadInfo>? onPlayheadChanged;
+
   const InteractiveChart({
     Key? key,
     required this.candles,
@@ -183,11 +217,21 @@ class InteractiveChart extends StatefulWidget {
     this.initialVerticalZoom = 1.0,
     this.enableVerticalPan = false,
     this.persistentCrosshair = false,
+    this.playheadIndex,
+    this.playheadTickProgress,
+    this.playheadStyle,
+    this.onPlayheadChanged,
   })  : this.style = style ?? const ChartStyle(),
         assert(candles.length >= 3,
             "InteractiveChart requires 3 or more CandleData"),
         assert(initialVisibleCandleCount >= 3,
             "initialVisibleCandleCount must be more 3 or more"),
+        assert(playheadIndex == null ||
+            (playheadIndex >= 0 && playheadIndex < candles.length),
+            "playheadIndex must be a valid index into candles"),
+        assert(playheadTickProgress == null ||
+            (playheadTickProgress >= 0 && playheadTickProgress <= 1),
+            "playheadTickProgress must be between 0 and 1"),
         super(key: key);
 
   @override
@@ -212,6 +256,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
   double? _prevStartOffset;
   Offset? _initialFocalPoint;
   PainterParams? _prevParams; // used in onTapUp event
+
+  // Captured on every tap-down regardless of [enableInteraction]. Used by
+  // [_fireOnTapEvent] so hosts can subscribe to "tap on empty area"
+  // even when the OHLC crosshair overlay (which is gated by
+  // enableInteraction via [_tapPosition]) is disabled.
+  Offset? _lastTapDownPosition;
   
   // Track previous candles length to detect when new candles are added
   int? _prevCandlesLength;
@@ -260,13 +310,30 @@ class _InteractiveChartState extends State<InteractiveChart> {
   double _verticalPanOffset = 0.0; // Vertical pan offset in price units
   double? _prevVerticalPanOffset;
 
+  // Replay playhead drag state. When true the current scale gesture
+  // is being interpreted as a playhead drag (instead of pan/zoom or
+  // overlay drag).
+  bool _isDraggingPlayhead = false;
+
+  /// The effective number of candles "available" to the chart. In
+  /// replay mode (when [InteractiveChart.playheadIndex] is set) this
+  /// is `playheadIndex + 1`; otherwise it is `widget.candles.length`.
+  int get _effectiveLength => widget.playheadIndex != null
+      ? widget.playheadIndex! + 1
+      : widget.candles.length;
+
   @override
   void initState() {
     super.initState();
     // Initialize vertical zoom from widget property
     _verticalZoomFactor = widget.initialVerticalZoom;
     // Attach controller if provided
-    widget.controller?.attach(jumpToLatest);
+    widget.controller?.attach(
+      jumpToLatest: jumpToLatest,
+      seekToIndex: seekToIndex,
+      seekToTimestamp: seekToTimestamp,
+      setVisibleCandleCount: setVisibleCandleCount,
+    );
   }
 
   @override
@@ -277,6 +344,39 @@ class _InteractiveChartState extends State<InteractiveChart> {
       setState(() {
         _tapPosition = null;
       });
+    }
+
+    // Replay: when the playhead changes (programmatically or via the
+    // built-in drag) the effective length of the chart may shrink.
+    // The user-controlled [_startOffset] could then point past the
+    // new max — leaving the visible window empty. Two protections:
+    //
+    //   1. Clamp [_startOffset] to the new max so we never render
+    //      "off the right edge of the world".
+    //   2. If after clamping the playhead is OUT of the visible
+    //      window, gently re-center the view so it's visible again
+    //      (mirrors TradingView's "follow on scrub" behaviour).
+    if (widget.playheadIndex != oldWidget.playheadIndex) {
+      final w = _prevChartWidth;
+      if (w != null) {
+        final maxOff = _getMaxStartOffset(w, _candleWidth);
+        if (_startOffset > maxOff) _startOffset = maxOff;
+
+        if (widget.playheadIndex != null) {
+          // Compute visible bounds the same way the build flow does
+          // so we never disagree with the painter about visibility.
+          final startIdx = (_startOffset / _candleWidth).floor();
+          final visibleCount = (w / _candleWidth).ceil();
+          final endIdxExclusive = startIdx + visibleCount; // +1 "extra"
+          final ph = widget.playheadIndex!;
+          if (ph < startIdx || ph > endIdxExclusive) {
+            // Place playhead at ~75% of the visible window.
+            final target = ph - visibleCount * 0.75;
+            _startOffset =
+                (target * _candleWidth).clamp(0, maxOff).toDouble();
+          }
+        }
+      }
     }
   }
 
@@ -302,13 +402,64 @@ class _InteractiveChartState extends State<InteractiveChart> {
   /// Jump to the latest candle (most recent data)
   void jumpToLatest() {
     if (_prevChartWidth == null) return;
-    
+
     final w = _prevChartWidth!;
     final count = w / _candleWidth;
-    final newOffset = (widget.candles.length - count) * _candleWidth;
-    
+    final newOffset = (_effectiveLength - count) * _candleWidth;
+
     setState(() {
       _startOffset = newOffset.clamp(0, _getMaxStartOffset(w, _candleWidth));
+    });
+  }
+
+  /// Center the visible range around an absolute candle index. The
+  /// index is clamped to the valid effective range.
+  void seekToIndex(int index) {
+    if (_prevChartWidth == null) return;
+    final w = _prevChartWidth!;
+    final count = w / _candleWidth;
+    final target = index.clamp(0, _effectiveLength - 1);
+    // Place [target] at roughly 75% of the visible window so the
+    // playhead has room to advance to the right before scrolling
+    // becomes necessary again.
+    final desired = target - count * 0.75;
+    final newOffset = (desired * _candleWidth)
+        .clamp(0, _getMaxStartOffset(w, _candleWidth));
+    setState(() {
+      _startOffset = newOffset.toDouble();
+    });
+  }
+
+  /// Same as [seekToIndex] but accepts a timestamp. Finds the closest
+  /// candle whose timestamp is `<=` the given value.
+  void seekToTimestamp(int timestamp) {
+    if (widget.candles.isEmpty) return;
+    int lo = 0, hi = _effectiveLength - 1;
+    while (lo < hi) {
+      final mid = (lo + hi + 1) ~/ 2;
+      if (widget.candles[mid].timestamp <= timestamp) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    seekToIndex(lo);
+  }
+
+  /// Sets the visible candle window. Higher values zoom out, lower
+  /// values zoom in. Clamped to the chart's min/max candle width.
+  void setVisibleCandleCount(int count) {
+    if (_prevChartWidth == null) return;
+    final w = _prevChartWidth!;
+    final newCandleWidth = (w / count).clamp(
+      _getMinCandleWidth(w),
+      _getMaxCandleWidth(w),
+    );
+    setState(() {
+      _candleWidth = newCandleWidth.toDouble();
+      _startOffset = _startOffset
+          .clamp(0, _getMaxStartOffset(w, _candleWidth))
+          .toDouble();
     });
   }
   
@@ -361,25 +512,52 @@ class _InteractiveChartState extends State<InteractiveChart> {
         }
         _prevCandlesLength = widget.candles.length;
 
-        // Find the visible data range
-        final int start = (_startOffset / _candleWidth).floor();
+        // Find the visible data range. In replay mode the effective
+        // length stops at the playhead — we never render or include
+        // candles past it.
+        final int effLen = _effectiveLength;
+
+        // Defensive clamp: in replay mode a shrinking effective
+        // length (after a backwards scrub) can leave _startOffset
+        // pointing past the new max. Re-clamp every build so the
+        // visible window never falls off the right edge.
+        final maxOff = _getMaxStartOffset(w, _candleWidth);
+        if (_startOffset > maxOff) _startOffset = maxOff;
+
+        final int start = (_startOffset / _candleWidth).floor().clamp(0, max(0, effLen - 1));
         final int count = (w / _candleWidth).ceil();
-        final int end = (start + count).clamp(start, widget.candles.length);
-        
+        final int end = (start + count).clamp(start, effLen);
+
         // Notify offset change if callback is provided
         _notifyOffsetChanged(start, end);
-        
+
         final candlesInRange = widget.candles.getRange(start, end).toList();
-        if (end < widget.candles.length) {
+        if (end < effLen) {
           // Put in an extra item, since it can become visible when scrolling
           final nextItem = widget.candles[end];
           candlesInRange.add(nextItem);
         }
 
+        // Tick-replay: replace the candle at the playhead with a
+        // partial candle that interpolates from open → close as
+        // [playheadTickProgress] goes 0 → 1.
+        if (widget.playheadIndex != null &&
+            widget.playheadTickProgress != null &&
+            widget.playheadTickProgress! < 1.0) {
+          final phRel = widget.playheadIndex! - start;
+          if (phRel >= 0 && phRel < candlesInRange.length) {
+            candlesInRange[phRel] = CandleData.buildPartial(
+              widget.candles[widget.playheadIndex!],
+              widget.playheadTickProgress!,
+            );
+          }
+        }
+
         // If possible, find neighbouring trend line data,
         // so the chart could draw better-connected lines
         final leadingTrends = widget.candles.at(start - 1)?.trends;
-        final trailingTrends = widget.candles.at(end + 1)?.trends;
+        final trailingTrends =
+            (end + 1 < effLen) ? widget.candles.at(end + 1)?.trends : null;
 
         // Find the horizontal shift needed when drawing the candles.
         // First, always shift the chart by half a candle, because when we
@@ -434,10 +612,24 @@ class _InteractiveChartState extends State<InteractiveChart> {
             .whereType<double>()
             .fold(double.infinity, min);
 
+        // The playhead index passed to PainterParams is the index
+        // INSIDE [candlesInRange] (the visible sublist). When the
+        // playhead falls outside the visible window we pass null so
+        // the painter does not draw anything. The host can surface a
+        // "playhead at <date>" hint outside the chart in that case.
+        int? phRelInVisible;
+        if (widget.playheadIndex != null) {
+          final rel = widget.playheadIndex! - start;
+          if (rel >= 0 && rel < candlesInRange.length) {
+            phRelInVisible = rel;
+          }
+        }
+
         final child = TweenAnimationBuilder(
           tween: PainterParamsTween(
             end: PainterParams(
               candles: candlesInRange,
+              fullCandles: widget.playheadIndex != null ? widget.candles : null,
               style: widget.style,
               size: size,
               candleWidth: _candleWidth,
@@ -450,6 +642,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
               tapPosition: _tapPosition,
               leadingTrends: leadingTrends,
               trailingTrends: trailingTrends,
+              playheadIndex: phRelInVisible,
+              playheadTickProgress: widget.playheadTickProgress,
+              playheadStyle: widget.playheadStyle,
             ),
           ),
           duration: Duration(milliseconds: 300),
@@ -545,6 +740,15 @@ class _InteractiveChartState extends State<InteractiveChart> {
               if (widget.persistentCrosshair) {
                 setState(() {
                   _tapPosition = details.localPosition;
+                });
+                return;
+              }
+              // FIRST-FIRST priority: replay playhead. Claim the
+              // pointer the moment it lands near the line so the
+              // crosshair / tap-to-select / pan flows never run.
+              if (_hitTestPlayhead(details.localPosition)) {
+                setState(() {
+                  _isDraggingPlayhead = true;
                 });
                 return;
               }
@@ -919,7 +1123,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   return;
                 }
               }
-              // Only show overlay info if interaction is enabled
+              // Capture the tap position for the host's onTap callback
+              // unconditionally — independent of the OHLC crosshair
+              // overlay (which is what [enableInteraction] gates).
+              _lastTapDownPosition = details.localPosition;
+              // Only show the overlay info / crosshair when the host
+              // opted into the tap interaction feature.
               if (widget.enableInteraction) {
                 setState(() {
                   _tapPosition = details.localPosition;
@@ -929,6 +1138,14 @@ class _InteractiveChartState extends State<InteractiveChart> {
             onTapUp: (_) {
               // Crosshair mode: keep the crosshair where the user placed it.
               if (widget.persistentCrosshair) {
+                return;
+              }
+              // Replay: the user tapped on (or near) the playhead but
+              // did not drag. Clear the latch and avoid firing onTap.
+              if (_isDraggingPlayhead) {
+                setState(() {
+                  _isDraggingPlayhead = false;
+                });
                 return;
               }
               // If overlay was selected but not dragged, fire its onTap callback and deselect it
@@ -957,6 +1174,43 @@ class _InteractiveChartState extends State<InteractiveChart> {
               if (widget.persistentCrosshair) {
                 setState(() {
                   _tapPosition = details.localFocalPoint;
+                });
+                return;
+              }
+              // Pinch (multi-finger) gestures ALWAYS pan/zoom — they
+              // never drag overlays. If onTapDown captured one with a
+              // single touch, release it now so the gesture flows to
+              // the normal pan/zoom path.
+              if (details.pointerCount > 1) {
+                if (_draggedOverlay != null) {
+                  setState(() {
+                    _draggedOverlay = null;
+                    _dragStartPrice = null;
+                    _dragInitialPrice = null;
+                    _originalPrice = null;
+                    _hasDragged = false;
+                    _isResizingTop = false;
+                    _isResizingBottom = false;
+                    _isResizingFibonacci = false;
+                    _isResizingTrendLine = false;
+                  });
+                }
+                _onScaleStart(details.localFocalPoint);
+                return;
+              }
+              // FIRST-FIRST priority: replay playhead drag. It sits
+              // on top of all overlays and consumes the gesture before
+              // any other hit-testing runs. Only claim single-finger
+              // gestures so pinch-zoom is unaffected.
+              //
+              // The flag may already be set by onTapDown — in that
+              // case we just need to keep the latch and skip the
+              // overlay hit-tests below.
+              if (_isDraggingPlayhead) return;
+              if (details.pointerCount == 1 &&
+                  _hitTestPlayhead(details.localFocalPoint)) {
+                setState(() {
+                  _isDraggingPlayhead = true;
                 });
                 return;
               }
@@ -1318,9 +1572,71 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 });
                 return;
               }
+              if (_isDraggingPlayhead) {
+                _onPlayheadDrag(details.localFocalPoint);
+                return;
+              }
+              // Pinch (two or more fingers) ALWAYS pans/zooms even
+              // if a single-finger tap previously captured an overlay
+              // (e.g. user puts finger on an SL line then lands a
+              // second finger to pinch-zoom).
+              if (details.pointerCount > 1 && _draggedOverlay != null) {
+                setState(() {
+                  _draggedOverlay = null;
+                  _dragStartPrice = null;
+                  _dragInitialPrice = null;
+                  _originalPrice = null;
+                  _hasDragged = false;
+                  _isResizingTop = false;
+                  _isResizingBottom = false;
+                  _isResizingFibonacci = false;
+                  _isResizingTrendLine = false;
+                });
+                _onScaleStart(details.localFocalPoint);
+              }
               if (_draggedOverlay != null) {
-                // Dragging an overlay
-                _hasDragged = true; // Mark that user has dragged
+                // Direction-aware drag commit. SL/TP/entry lines are
+                // semantically VERTICAL drags (price changes); pan
+                // gestures across the chart are predominantly
+                // horizontal. Below a small deadband we ignore the
+                // motion entirely; once we cross it, the larger axis
+                // decides whether we commit to a drag or release the
+                // overlay and treat the gesture as a pan.
+                if (!_hasDragged) {
+                  final start = _dragStartPosition ?? _initialFocalPoint;
+                  if (start != null) {
+                    final dx = (details.localFocalPoint.dx - start.dx).abs();
+                    final dy = (details.localFocalPoint.dy - start.dy).abs();
+                    const deadband = 6.0;
+                    if (dx < deadband && dy < deadband) {
+                      return; // wait for a more decisive movement
+                    }
+                    // Horizontal-dominant: user is panning, not
+                    // editing a price line. Release the overlay and
+                    // forward to the pan/zoom path.
+                    if (dx > dy * 1.3) {
+                      setState(() {
+                        _draggedOverlay = null;
+                        _dragStartPrice = null;
+                        _dragInitialPrice = null;
+                        _originalPrice = null;
+                        _hasDragged = false;
+                        _isResizingTop = false;
+                        _isResizingBottom = false;
+                        _isResizingFibonacci = false;
+                        _isResizingTrendLine = false;
+                      });
+                      _onScaleStart(details.localFocalPoint);
+                      _onScaleUpdate(
+                        details.scale,
+                        details.localFocalPoint,
+                        w,
+                      );
+                      return;
+                    }
+                  }
+                }
+                _hasDragged = true;
                 _onOverlayDrag(details.localFocalPoint);
               } else {
                 // Normal zoom/pan
@@ -1330,6 +1646,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
             onScaleEnd: (details) {
               // Crosshair mode: keep the crosshair at its last position.
               if (widget.persistentCrosshair) {
+                return;
+              }
+              if (_isDraggingPlayhead) {
+                setState(() {
+                  _isDraggingPlayhead = false;
+                });
                 return;
               }
               if (_draggedOverlay != null) {
@@ -1449,6 +1771,62 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _prevVerticalPanOffset = _verticalPanOffset;
   }
 
+  /// Returns true if [position] is close enough to the playhead line
+  /// to capture the gesture. Only true when the playhead is currently
+  /// visible, draggable, and configured with a style.
+  bool _hitTestPlayhead(Offset position) {
+    if (widget.playheadIndex == null) return false;
+    final style = widget.playheadStyle;
+    if (style == null || !style.draggable) return false;
+    if (widget.onPlayheadChanged == null) return false;
+
+    final params = _prevParams;
+    if (params == null) return false;
+
+    // Compute the playhead's screen-space X. params.playheadIndex is
+    // relative to the visible sublist and is only set when in range.
+    final phRel = params.playheadIndex;
+    if (phRel == null) return false;
+
+    final phX = phRel * params.candleWidth + params.xShift;
+    return (position.dx - phX).abs() <= style.hitRadius &&
+        position.dy >= 0 &&
+        position.dy <= params.chartHeight;
+  }
+
+  /// Convert a finger position into an absolute candle index and fire
+  /// the [InteractiveChart.onPlayheadChanged] callback.
+  ///
+  /// Clamping subtlety: we MUST NOT use `_effectiveLength - 1` as the
+  /// upper bound here, because `_effectiveLength` is derived from the
+  /// CURRENT playhead — clamping to it would forbid forward movement
+  /// entirely. The drag is the act of choosing a new playhead, so the
+  /// real bound is the loaded candle buffer, `widget.candles.length - 1`.
+  void _onPlayheadDrag(Offset position) {
+    final params = _prevParams;
+    if (params == null) return;
+    final cb = widget.onPlayheadChanged;
+    if (cb == null) return;
+
+    // Convert visible-relative X back to an absolute candle index.
+    final visibleStart = (params.startOffset / params.candleWidth).floor();
+    final relIdxF = (position.dx - params.xShift) / params.candleWidth;
+    final absIdxF = relIdxF + visibleStart;
+    final clampedIdx = absIdxF
+        .round()
+        .clamp(0, max(0, widget.candles.length - 1))
+        .toInt();
+
+    // Interpolated timestamp for the host's "fine" label.
+    final interp = params.getTimestampFromX(position.dx - params.xShift) ??
+        widget.candles[clampedIdx].timestamp;
+    cb(PlayheadInfo(
+      candleIndex: clampedIdx,
+      candleTimestamp: widget.candles[clampedIdx].timestamp,
+      interpolatedTimestamp: interp,
+    ));
+  }
+
   _onScaleUpdate(double scale, Offset focalPoint, double w) {
     // Return early if not initialized
     if (_prevCandleWidth == null || _prevStartOffset == null || _initialFocalPoint == null) {
@@ -1516,26 +1894,26 @@ class _InteractiveChartState extends State<InteractiveChart> {
       // Default zoom level. Defaults to a 90 day chart, but configurable.
       // If data is shorter, we use the whole range.
       final count = min(
-        widget.candles.length,
+        _effectiveLength,
         widget.initialVisibleCandleCount,
       );
       _candleWidth = w / count;
       // Default show the latest available data, e.g. the most recent 90 days.
-      _startOffset = (widget.candles.length - count) * _candleWidth;
+      _startOffset = (_effectiveLength - count) * _candleWidth;
     }
     _prevChartWidth = w;
   }
 
   // The narrowest candle width, i.e. when drawing all available data points.
-  double _getMinCandleWidth(double w) => w / widget.candles.length;
+  double _getMinCandleWidth(double w) => w / _effectiveLength;
 
   // The widest candle width, e.g. when drawing 14 day chart
-  double _getMaxCandleWidth(double w) => w / min(14, widget.candles.length);
+  double _getMaxCandleWidth(double w) => w / min(14, _effectiveLength);
 
   // Max start offset: how far can we scroll towards the end of the chart
   double _getMaxStartOffset(double w, double candleWidth) {
     final count = w / candleWidth; // visible candles in the window
-    final start = widget.candles.length + widget.futureCandles - count;
+    final start = _effectiveLength + widget.futureCandles - count;
     return max(0, candleWidth * start);
   }
 
@@ -1584,17 +1962,22 @@ class _InteractiveChartState extends State<InteractiveChart> {
       offset: _startOffset,
       startCandleIndex: start,
       endCandleIndex: end,
-      totalCandles: widget.candles.length,
+      totalCandles: _effectiveLength,
     );
     
     widget.onXOffsetChanged!.call(details);
   }
 
   void _fireOnTapEvent() {
-    if (_prevParams == null || _tapPosition == null) return;
+    // Use the always-captured tap position so hosts get notified of
+    // empty-area taps even when [enableInteraction] is false. Fall
+    // back to [_tapPosition] for backwards compatibility in case a
+    // caller invokes this before any onTapDown.
+    final pos = _lastTapDownPosition ?? _tapPosition;
+    if (_prevParams == null || pos == null) return;
     final params = _prevParams!;
-    final dx = _tapPosition!.dx;
-    final dy = _tapPosition!.dy;
+    final dx = pos.dx;
+    final dy = pos.dy;
     final selected = params.getCandleIndexFromOffset(dx);
     final tapPrice = params.getPriceFromY(dy);
     final timestamp = params.getTimestampFromX(dx);

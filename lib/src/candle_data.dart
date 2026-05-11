@@ -71,6 +71,64 @@ class CandleData {
     return result;
   }
 
+  /// Builds a "partially formed" candle for tick-replay mode.
+  ///
+  /// Given a fully-closed [real] candle and a [progress] in `[0.0, 1.0]`,
+  /// returns a synthetic candle whose `close` interpolates linearly from
+  /// `real.open` (at progress 0) to `real.close` (at progress 1). `high`
+  /// and `low` are clipped so they always include both `open` and the
+  /// interpolated `close` — this avoids the wick "popping out" only at
+  /// progress 1.
+  ///
+  /// Returns the original candle unchanged when `progress >= 1.0`.
+  /// Returns a flat candle (`open == close == high == low`) when
+  /// `progress <= 0.0`.
+  ///
+  /// Volume is scaled linearly with progress.
+  ///
+  /// This is the simplest fallback for tick replay when no smaller
+  /// timeframe is available. For higher fidelity, replace the candle
+  /// at the playhead with an actual sub-timeframe candle and pass
+  /// `progress = 1.0` for each sub-step instead.
+  static CandleData buildPartial(CandleData real, double progress) {
+    final p = progress.clamp(0.0, 1.0);
+    final open = real.open;
+    final close = real.close;
+    if (open == null || close == null) {
+      return real;
+    }
+    if (p >= 1.0) return real;
+    if (p <= 0.0) {
+      return CandleData(
+        timestamp: real.timestamp,
+        open: open,
+        close: open,
+        high: open,
+        low: open,
+        volume: 0,
+        trends: real.trends,
+      );
+    }
+    final interpClose = open + (close - open) * p;
+    final realHigh = real.high ?? (open > close ? open : close);
+    final realLow = real.low ?? (open < close ? open : close);
+    // Lerp the wicks proportionally — they "grow" as progress advances.
+    final hi = open > interpClose ? open : interpClose;
+    final lo = open < interpClose ? open : interpClose;
+    final high = hi + (realHigh - hi) * p;
+    final low = lo - (lo - realLow) * p;
+    final vol = (real.volume ?? 0) * p;
+    return CandleData(
+      timestamp: real.timestamp,
+      open: open,
+      close: interpClose,
+      high: high,
+      low: low,
+      volume: vol,
+      trends: real.trends,
+    );
+  }
+
   @override
   String toString() => "<CandleData ($timestamp: $close)>";
 }

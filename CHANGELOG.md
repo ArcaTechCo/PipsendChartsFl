@@ -1,3 +1,28 @@
+## 1.4.0
+
+**Replay Mode — Playhead, Tick Progress & Programmatic Seeking**
+
+### New Features
+* **`InteractiveChart.playheadIndex`** — when non-null the chart enters replay mode: candles past this index are not drawn, indicators still calculate over the full series (cache stable), and the visible range / `XAxisOffsetDetails.totalCandles` use `playheadIndex + 1` as the effective length.
+* **`InteractiveChart.playheadTickProgress`** — sub-candle progress in `[0.0, 1.0]`. The candle at the playhead is replaced visually by `CandleData.buildPartial` and animated smoothly via the painter tween.
+* **`InteractiveChart.playheadStyle`** (`PlayheadStyle`) — visual configuration for the built-in playhead: line color/width/dash, optional date label, optional translucent dim on the right side, drag handles, and configurable hit radius. When `null` the playhead is not rendered (host can still draw it as an overlay).
+* **`InteractiveChart.onPlayheadChanged`** — fired with `PlayheadInfo` (candle index + canonical timestamp + interpolated timestamp) when the user drags the built-in playhead.
+* **`InteractiveChartController.seekToIndex(int)`** — center the visible range on the given candle index.
+* **`InteractiveChartController.seekToTimestamp(int)`** — same, by timestamp.
+* **`InteractiveChartController.setVisibleCandleCount(int)`** — programmatically zoom the chart.
+* **`CandleData.buildPartial(real, progress)`** — helper that returns an interpolated candle for tick-replay (open is fixed, close lerps to real close, wicks grow with progress).
+* **`PainterParams.fullCandles`** — when set, indicators compute over this list instead of `candles` (the visible sublist). Set automatically by `InteractiveChart` when in replay mode.
+
+### Replay UX
+* Built-in single-finger drag on the playhead is consumed before pan/zoom/overlay drags. Pinch gestures (`pointerCount > 1`) pass through to zoom unaffected.
+* `PlayheadStyle.dimRightSide` overlays a translucent rectangle from the playhead to the right edge, communicating that the future is hidden.
+
+### Backwards Compatibility
+* All changes are additive. Charts without the new props behave exactly as in 1.3.0.
+* `InteractiveChartController.attach(...)` switched to named parameters. Old code that passed a positional `jumpToLatest` callback must update — this is the only breaking change to the public API.
+
+---
+
 ## 1.3.0
 
 **Persistent Crosshair, Dashed Style & Tap-to-Select on Non-Draggable Lines**

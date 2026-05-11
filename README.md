@@ -621,6 +621,37 @@ onXOffsetChanged: (details) {
 
 See the **Infinite History** tab in the example app for a complete working demo.
 
+### Replay Mode (1.4.0+)
+
+Render the chart as if frozen at any historical moment. Candles past the playhead are hidden; indicators keep computing over the full series so their cache stays warm. The playhead can be dragged like a video scrubber, and tick replay smoothly interpolates the in-progress candle:
+
+```dart
+InteractiveChart(
+  candles: candles,           // full history (load once, large buffer)
+  playheadIndex: playhead,    // last visible candle
+  playheadTickProgress: tick, // 0.0..1.0 — sub-candle for tick mode
+  playheadStyle: const PlayheadStyle(
+    lineColor: Colors.blueAccent,
+    dimRightSide: true,       // translucent overlay over the "future"
+    draggable: true,
+  ),
+  onPlayheadChanged: (info) {
+    // Update your replay state with info.candleIndex / info.candleTimestamp
+  },
+  controller: replayController, // optional, for seekToIndex/seekToTimestamp
+)
+```
+
+Key behaviors:
+
+- The chart's effective length becomes `playheadIndex + 1`. Pan/zoom limits, `XAxisOffsetDetails.totalCandles`, and `jumpToLatest()` all honor it.
+- Indicators receive the full untrimmed list internally; cached values stay valid across playhead moves.
+- `CandleData.buildPartial(real, progress)` replaces the playhead candle for smooth tick animation when `playheadTickProgress` is set.
+- A single-finger drag on the playhead is consumed before pan/zoom — pinch (multi-finger) still zooms normally.
+- The companion `InteractiveChartController` adds `seekToIndex`, `seekToTimestamp`, and `setVisibleCandleCount` for programmatic control (e.g. follow-mode while playing).
+
+See the **Replay** tab in the example app for a complete working demo.
+
 ---
 
 ## 💡 Examples

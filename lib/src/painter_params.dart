@@ -3,11 +3,20 @@ import 'package:flutter/widgets.dart';
 
 import 'chart_style.dart';
 import 'candle_data.dart';
+import 'overlays/playhead_style.dart';
 
 class PainterParams {
   static bool _volumeWarningShown = false;
 
   final List<CandleData> candles;
+
+  /// The full, untrimmed list of candles. Used by indicators so their
+  /// calculation cache stays stable across pan/zoom and across replay
+  /// playhead moves. Null in legacy (non-replay) mode, in which case
+  /// indicators fall back to [candles] (the visible sublist) for
+  /// computation.
+  final List<CandleData>? fullCandles;
+
   final ChartStyle style;
   final Size size;
   final double candleWidth;
@@ -22,10 +31,26 @@ class PainterParams {
   final Offset? tapPosition;
   final List<double?>? leadingTrends;
   final List<double?>? trailingTrends;
-  
+
+  /// Index of the replay playhead in the visible candle list, or null
+  /// when replay mode is off. Note this is the index inside [candles]
+  /// (which is the sublist passed to the painter), not the absolute
+  /// index in the host's full dataset.
+  final int? playheadIndex;
+
+  /// Sub-candle progress (0.0..1.0) for tick replay. Only meaningful
+  /// when [playheadIndex] is non-null. Used by the tween to animate
+  /// the partial candle smoothly between paint frames.
+  final double? playheadTickProgress;
+
+  /// Visual style for the playhead. When null, the playhead is not
+  /// rendered by the chart painter (the host can still draw its own
+  /// via overlays).
+  final PlayheadStyle? playheadStyle;
+
   /// The price level at the tap position (null if not tapping).
-  double? get tapPrice => tapPosition != null 
-      ? getPriceFromY(tapPosition!.dy) 
+  double? get tapPrice => tapPosition != null
+      ? getPriceFromY(tapPosition!.dy)
       : null;
 
   PainterParams({
@@ -42,6 +67,10 @@ class PainterParams {
     required this.tapPosition,
     required this.leadingTrends,
     required this.trailingTrends,
+    this.fullCandles,
+    this.playheadIndex,
+    this.playheadTickProgress,
+    this.playheadStyle,
   });
 
   double get chartWidth => // width without price labels
@@ -179,8 +208,25 @@ class PainterParams {
   static PainterParams lerp(PainterParams a, PainterParams b, double t) {
     double lerpField(double getField(PainterParams p)) =>
         lerpDouble(getField(a), getField(b), t)!;
+    // Tick progress lerps as a float when both sides have it. Index
+    // does NOT lerp — it would create fractional indices that the
+    // painter cannot use. When the index changes mid-animation we
+    // simply snap to the new value.
+    final double? tickProgress;
+    if (a.playheadTickProgress != null &&
+        b.playheadTickProgress != null &&
+        a.playheadIndex == b.playheadIndex) {
+      tickProgress = lerpDouble(
+        a.playheadTickProgress!,
+        b.playheadTickProgress!,
+        t,
+      );
+    } else {
+      tickProgress = b.playheadTickProgress;
+    }
     return PainterParams(
       candles: b.candles,
+      fullCandles: b.fullCandles,
       style: b.style,
       size: b.size,
       candleWidth: b.candleWidth,
@@ -193,6 +239,9 @@ class PainterParams {
       tapPosition: b.tapPosition,
       leadingTrends: b.leadingTrends,
       trailingTrends: b.trailingTrends,
+      playheadIndex: b.playheadIndex,
+      playheadTickProgress: tickProgress,
+      playheadStyle: b.playheadStyle,
     );
   }
 
@@ -215,6 +264,10 @@ class PainterParams {
         trailingTrends != other.trailingTrends) return true;
 
     if (style != other.style) return true;
+
+    if (playheadIndex != other.playheadIndex ||
+        playheadTickProgress != other.playheadTickProgress ||
+        playheadStyle != other.playheadStyle) return true;
 
     return false;
   }

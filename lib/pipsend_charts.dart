@@ -44,6 +44,10 @@ export 'src/indicators/cci_indicator.dart';
 export 'src/indicators/williams_r_indicator.dart';
 export 'src/indicators/obv_indicator.dart';
 
+// Replay Playhead
+export 'src/overlays/playhead_style.dart';
+export 'src/overlays/playhead_info.dart';
+
 // Overlays & Trading Lines
 export 'src/overlays/overlay.dart';
 export 'src/overlays/overlay_helper.dart';

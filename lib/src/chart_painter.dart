@@ -124,6 +124,14 @@ class ChartPainter extends CustomPainter {
     // Draw indicators
     _drawIndicators(canvas, params);
 
+    // Draw replay playhead (and the optional "dim future" overlay) on
+    // top of everything except the tap interaction. The dim is drawn
+    // first so the line itself remains crisp on top of it.
+    if (params.playheadIndex != null && params.playheadStyle != null) {
+      _drawDimRightSide(canvas, params);
+      _drawPlayhead(canvas, params);
+    }
+
     // Draw tap highlight & overlay
     if (params.tapPosition != null) {
       final tapIdx = params.getCandleIndexFromOffset(params.tapPosition!.dx);
@@ -131,6 +139,142 @@ class ChartPainter extends CustomPainter {
         _drawTapHighlightAndOverlay(canvas, params);
       }
     }
+  }
+
+  /// Converts the playhead index (relative to the visible candle
+  /// sublist) into a screen-space X coordinate. The chart's drawable
+  /// area starts at x=0 and ends at x=params.chartWidth.
+  double _playheadScreenX(PainterParams params) {
+    final i = params.playheadIndex!;
+    return i * params.candleWidth + params.xShift;
+  }
+
+  /// Paints the vertical playhead line with optional label and drag
+  /// handles. Runs in screen space (no canvas.translate). Caller
+  /// guarantees the playhead falls within the visible candle sublist.
+  void _drawPlayhead(Canvas canvas, PainterParams params) {
+    final style = params.playheadStyle!;
+    final drawX = _playheadScreenX(params).clamp(0.0, params.chartWidth);
+
+    final paint = Paint()
+      ..color = style.lineColor
+      ..strokeWidth = style.lineWidth
+      ..strokeCap = StrokeCap.round;
+
+    final top = Offset(drawX, 0);
+    final bottom = Offset(drawX, params.chartHeight);
+
+    if (style.dashPattern != null && style.dashPattern!.length >= 2) {
+      _drawDashedLine(
+        canvas,
+        top,
+        bottom,
+        paint,
+        dashLength: style.dashPattern![0],
+        gapLength: style.dashPattern![1],
+      );
+    } else {
+      canvas.drawLine(top, bottom, paint);
+    }
+
+    if (style.showDragHandles && style.draggable) {
+      // Diamond grab handle at the vertical midpoint of the chart.
+      // Size is configurable via PlayheadStyle.handleSize.
+      final handleSize = style.handleSize;
+      final handlePaint = Paint()
+        ..color = style.lineColor
+        ..style = PaintingStyle.fill;
+      final center = Offset(drawX, params.chartHeight * 0.5);
+      final path = Path()
+        ..moveTo(center.dx, center.dy - handleSize)
+        ..lineTo(center.dx + handleSize, center.dy)
+        ..lineTo(center.dx, center.dy + handleSize)
+        ..lineTo(center.dx - handleSize, center.dy)
+        ..close();
+      canvas.drawPath(path, handlePaint);
+    }
+
+    if (style.showLabel) {
+      final ts = _playheadTimestamp(params);
+      if (ts != null) {
+        final labelText = getTimeLabel(ts, params.candles.length);
+        final textStyle = style.labelStyle ??
+            TextStyle(
+              color: _contrastingTextColor(style.labelBackground),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            );
+        final tp = TextPainter(
+          text: TextSpan(text: labelText, style: textStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        final labelW = tp.width + style.labelHorizontalPadding * 2;
+        final labelH = tp.height + style.labelVerticalPadding * 2;
+        // Position: just above the time-label strip at the bottom.
+        final labelTop = params.chartHeight - labelH - 2;
+        final labelLeft = (drawX - labelW / 2)
+            .clamp(0.0, params.chartWidth - labelW);
+        final rect = Rect.fromLTWH(labelLeft, labelTop, labelW, labelH);
+        final rrect = RRect.fromRectAndRadius(
+          rect,
+          const Radius.circular(3),
+        );
+        canvas.drawRRect(
+          rrect,
+          Paint()..color = style.labelBackground,
+        );
+        tp.paint(
+          canvas,
+          Offset(
+            labelLeft + style.labelHorizontalPadding,
+            labelTop + style.labelVerticalPadding,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Paints a translucent rectangle covering the area to the right of
+  /// the playhead (within the chart's drawable region). Used in replay
+  /// mode to visually communicate that the "future" is hidden.
+  void _drawDimRightSide(Canvas canvas, PainterParams params) {
+    final style = params.playheadStyle!;
+    if (!style.dimRightSide) return;
+    final x = _playheadScreenX(params);
+    if (x >= params.chartWidth) return; // nothing to dim
+    final left = x.clamp(0.0, params.chartWidth);
+    final rect = Rect.fromLTRB(
+      left,
+      0,
+      params.chartWidth,
+      params.chartHeight,
+    );
+    final paint = Paint()
+      ..color = style.dimColor.withValues(alpha: style.dimOpacity);
+    canvas.drawRect(rect, paint);
+  }
+
+  /// Returns the timestamp at the playhead position. Honors tick
+  /// progress when set: linearly interpolates between the candle at
+  /// playheadIndex and the next one.
+  int? _playheadTimestamp(PainterParams params) {
+    final i = params.playheadIndex!;
+    if (i < 0 || i >= params.candles.length) return null;
+    final base = params.candles[i].timestamp;
+    final tick = params.playheadTickProgress;
+    if (tick == null || tick <= 0 || i + 1 >= params.candles.length) {
+      return base;
+    }
+    final next = params.candles[i + 1].timestamp;
+    return (base + (next - base) * tick.clamp(0.0, 1.0)).round();
+  }
+
+  /// Picks black or white based on the brightness of [bg] so a label
+  /// drawn on top of [bg] stays legible.
+  Color _contrastingTextColor(Color bg) {
+    return bg.computeLuminance() > 0.55
+        ? const Color(0xFF000000)
+        : const Color(0xFFFFFFFF);
   }
 
   void _drawOverlays(Canvas canvas, PainterParams params) {
@@ -1082,7 +1226,12 @@ class ChartPainter extends CustomPainter {
       if (!indicator.visible) continue;
 
       // Calculate indicator values
-      final values = indicator.getValues(params.candles);
+      // In replay mode, indicators compute over the full untrimmed
+      // dataset (so the cache stays stable across pan/zoom/playhead
+      // moves). The paint method then cross-references via timestamp
+      // to figure out where each value falls in the visible range.
+      final dataForIndicator = params.fullCandles ?? params.candles;
+      final values = indicator.getValues(dataForIndicator);
       
       // Draw the indicator
       indicator.paint(canvas, params, values);
