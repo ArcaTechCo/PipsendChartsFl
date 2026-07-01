@@ -6,6 +6,7 @@ import 'candle_data.dart';
 import 'painter_params.dart';
 import 'grid_style.dart';
 import 'overlays/overlay.dart';
+import 'overlays/drawing_placement.dart';
 import 'overlays/trading_line.dart';
 import 'overlays/price_zone.dart';
 import 'overlays/fibonacci_retracement.dart';
@@ -25,11 +26,14 @@ typedef TimeLabelGetter = String Function(int timestamp, int visibleDataCount);
 typedef PriceLabelGetter = String Function(double price);
 typedef OverlayInfoGetter = Map<String, String> Function(CandleData candle);
 
+typedef CrosshairTimeLabelGetter = String Function(int timestamp);
+
 class ChartPainter extends CustomPainter {
   final PainterParams params;
   final TimeLabelGetter getTimeLabel;
   final PriceLabelGetter getPriceLabel;
   final OverlayInfoGetter getOverlayInfo;
+  final CrosshairTimeLabelGetter getCrosshairTimeLabel;
   final List<ChartOverlay> overlays;
   final List<Indicator> indicators;
   final ChartOverlay? draggedOverlay;
@@ -64,6 +68,7 @@ class ChartPainter extends CustomPainter {
     required this.getTimeLabel,
     required this.getPriceLabel,
     required this.getOverlayInfo,
+    required this.getCrosshairTimeLabel,
     this.overlays = const [],
     this.indicators = const [],
     this.draggedOverlay,
@@ -137,6 +142,113 @@ class ChartPainter extends CustomPainter {
       final tapIdx = params.getCandleIndexFromOffset(params.tapPosition!.dx);
       if (tapIdx >= 0 && tapIdx < params.candles.length) {
         _drawTapHighlightAndOverlay(canvas, params);
+      }
+    }
+
+    if (params.placement != null) {
+      _drawPlacement(canvas, params);
+    }
+  }
+
+  void _drawPlacement(Canvas canvas, PainterParams params) {
+    final placement = params.placement!;
+    final color = placement.color;
+
+    final pts = <Offset>[];
+    for (final p in params.placementPoints ?? const <PlacementPoint>[]) {
+      final x = (params.fitTimestamp(p.timestamp) ?? 0) + params.xShift;
+      pts.add(Offset(x, params.fitPrice(p.price)));
+    }
+    final cursor = params.placementCursor;
+
+    if (placement.preview != PlacementPreviewShape.none && pts.isNotEmpty) {
+      final a = pts.first;
+      final b = cursor ?? (pts.length > 1 ? pts[1] : null);
+      if (b != null) {
+        if (placement.preview == PlacementPreviewShape.rectangle) {
+          final rect = Rect.fromPoints(a, b);
+          canvas.drawRect(rect, Paint()..color = color.withValues(alpha: 0.12));
+          canvas.drawRect(
+            rect,
+            Paint()
+              ..color = color
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.5,
+          );
+        } else if (placement.preview == PlacementPreviewShape.line) {
+          canvas.drawLine(
+            a,
+            b,
+            Paint()
+              ..color = color
+              ..strokeWidth = 1.5,
+          );
+        }
+      }
+    }
+
+    for (final p in pts) {
+      canvas.drawCircle(p, 5, Paint()..color = color);
+      canvas.drawCircle(
+        p,
+        5,
+        Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
+
+    if (cursor != null) {
+      final linePaint = Paint()
+        ..strokeWidth = 1.0
+        ..color = color
+        ..style = PaintingStyle.stroke;
+      _drawDashedLine(
+        canvas,
+        Offset(cursor.dx, 0),
+        Offset(cursor.dx, params.chartHeight),
+        linePaint,
+        dashLength: 5,
+        gapLength: 3,
+      );
+      _drawDashedLine(
+        canvas,
+        Offset(0, cursor.dy),
+        Offset(params.chartWidth, cursor.dy),
+        linePaint,
+        dashLength: 5,
+        gapLength: 3,
+      );
+      canvas.drawCircle(cursor, 5, Paint()..color = color);
+      canvas.drawCircle(
+        cursor,
+        5,
+        Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+
+      _drawCrosshairChip(
+        canvas,
+        getPriceLabel(params.getPriceFromY(cursor.dy)),
+        params.style.priceLabelStyle,
+        color,
+        centerY: cursor.dy,
+        rightX: params.chartWidth + params.style.priceLabelWidth,
+      );
+      final ts = params.getTimestampFromX(cursor.dx - params.xShift);
+      if (ts != null) {
+        _drawCrosshairChip(
+          canvas,
+          getCrosshairTimeLabel(ts),
+          params.style.timeLabelStyle,
+          color,
+          centerY: params.chartHeight + params.style.timeLabelHeight / 2,
+          centerX: cursor.dx,
+          clampWithin: params.chartWidth,
+        );
       }
     }
   }
@@ -1051,14 +1163,16 @@ class ChartPainter extends CustomPainter {
 
   void _drawTapHighlightAndOverlay(canvas, PainterParams params) {
     final pos = params.tapPosition!;
-    final i = params.getCandleIndexFromOffset(pos.dx);
+    final i = params
+        .getCandleIndexFromOffset(pos.dx)
+        .clamp(0, params.candles.length - 1);
     final candle = params.candles[i];
     final dashed = params.style.crosshairDashed;
     canvas.save();
     canvas.translate(params.xShift, 0.0);
     if (dashed) {
       // Thin dashed vertical line through the center of the selected candle
-      final centerX = i * params.candleWidth + params.candleWidth / 2;
+      final centerX = i * params.candleWidth;
       final paint = Paint()
         ..strokeWidth = 1.0
         ..color = params.style.selectionHighlightColor.withValues(alpha: 0.8)
@@ -1106,30 +1220,63 @@ class ChartPainter extends CustomPainter {
         );
       }
       
-      // Draw price label on the right
-      final priceText = getPriceLabel(params.tapPrice!);
-      final priceTp = TextPainter(
-        text: TextSpan(
-          text: priceText,
-          style: params.style.priceLabelStyle.copyWith(
-            backgroundColor: params.style.selectionHighlightColor,
-          ),
-        ),
-      )
-        ..textDirection = TextDirection.ltr
-        ..layout();
-      
-      priceTp.paint(
+      _drawCrosshairChip(
         canvas,
-        Offset(
-          params.chartWidth + 4,
-          priceY - priceTp.height / 2,
-        ),
+        getPriceLabel(params.tapPrice!),
+        params.style.priceLabelStyle,
+        params.style.effectiveCrosshairLabelColor,
+        centerY: priceY,
+        rightX: params.chartWidth + params.style.priceLabelWidth,
       );
     }
-    
-    // Draw info pane
-    _drawTapInfoOverlay(canvas, params, candle);
+
+    final lineX = i * params.candleWidth + params.xShift;
+    _drawCrosshairChip(
+      canvas,
+      getCrosshairTimeLabel(candle.timestamp),
+      params.style.timeLabelStyle,
+      params.style.effectiveCrosshairLabelColor,
+      centerY: params.chartHeight + params.style.timeLabelHeight / 2,
+      centerX: lineX,
+      clampWithin: params.chartWidth,
+    );
+
+    if (params.showCrosshairInfoPanel) {
+      _drawTapInfoOverlay(canvas, params, candle);
+    }
+  }
+
+  void _drawCrosshairChip(
+    Canvas canvas,
+    String text,
+    TextStyle baseStyle,
+    Color bg, {
+    required double centerY,
+    double? centerX,
+    double? leftX,
+    double? rightX,
+    double? clampWithin,
+  }) {
+    const padH = 6.0;
+    const padV = 3.0;
+    final textColor = bg.computeLuminance() > 0.5
+        ? const Color(0xFF000000)
+        : const Color(0xFFFFFFFF);
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: baseStyle.copyWith(color: textColor)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final w = tp.width + padH * 2;
+    final h = tp.height + padV * 2;
+    double left = rightX != null ? rightX - w : (leftX ?? (centerX! - w / 2));
+    if (clampWithin != null) left = left.clamp(0.0, clampWithin - w);
+    final top = centerY - h / 2;
+    final rect = Rect.fromLTWH(left, top, w, h);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+      Paint()..color = bg,
+    );
+    tp.paint(canvas, Offset(left + padH, top + padV));
   }
 
   void _drawTapInfoOverlay(canvas, PainterParams params, CandleData candle) {

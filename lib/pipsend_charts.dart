@@ -51,6 +51,7 @@ export 'src/overlays/playhead_info.dart';
 // Overlays & Trading Lines
 export 'src/overlays/overlay.dart';
 export 'src/overlays/overlay_helper.dart';
+export 'src/overlays/drawing_placement.dart';
 export 'src/overlays/trading_line.dart';
 export 'src/overlays/trading_line_type.dart';
 export 'src/overlays/trading_line_style.dart';

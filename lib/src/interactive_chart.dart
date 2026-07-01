@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/gestures.dart';
@@ -13,6 +14,7 @@ import 'x_axis_offset_details.dart';
 import 'tap_details.dart';
 import 'interactive_chart_controller.dart';
 import 'overlays/overlay.dart';
+import 'overlays/drawing_placement.dart';
 import 'overlays/trading_line.dart';
 import 'overlays/price_zone.dart';
 import 'overlays/fibonacci_retracement.dart';
@@ -52,6 +54,10 @@ class InteractiveChart extends StatefulWidget {
   /// If null, it defaults to use yyyy-mm format if more than 20 data points
   /// are visible in the current chart window, otherwise it uses mm-dd format.
   final TimeLabelGetter? timeLabel;
+
+  /// Full date + time label shown under the crosshair. Defaults to a
+  /// locale-aware "EEE d MMM yy · HH:mm" format.
+  final CrosshairTimeLabelGetter? crosshairTimeLabel;
 
   /// How the price labels on the right are displayed.
   ///
@@ -164,6 +170,21 @@ class InteractiveChart extends StatefulWidget {
   /// Requires [enableInteraction] to be true.
   final bool persistentCrosshair;
 
+  /// Fired when a long-press toggles the crosshair on/off. The argument is
+  /// the requested new state; the host should reflect it back via
+  /// [persistentCrosshair]. When null, long-press does not toggle.
+  final ValueChanged<bool>? onCrosshairActiveChanged;
+
+  /// When non-null, the chart enters TradingView-style placement mode: an
+  /// interactive crosshair is shown and the user places [DrawingPlacement.pointCount]
+  /// points (drag to position, tap/release to confirm each). Pan/zoom and
+  /// overlay editing are suspended while active.
+  final DrawingPlacement? placement;
+
+  /// Fired once all placement points are confirmed. The host builds the real
+  /// drawing from these points and clears [placement].
+  final ValueChanged<List<PlacementPoint>>? onPlacementComplete;
+
   /// Absolute index into [candles] of the replay playhead. When null
   /// the chart behaves normally (no replay).
   ///
@@ -202,6 +223,7 @@ class InteractiveChart extends StatefulWidget {
     this.initialVisibleCandleCount = 90,
     ChartStyle? style,
     this.timeLabel,
+    this.crosshairTimeLabel,
     this.priceLabel,
     this.overlayInfo,
     this.onTap,
@@ -217,6 +239,9 @@ class InteractiveChart extends StatefulWidget {
     this.initialVerticalZoom = 1.0,
     this.enableVerticalPan = false,
     this.persistentCrosshair = false,
+    this.onCrosshairActiveChanged,
+    this.placement,
+    this.onPlacementComplete,
     this.playheadIndex,
     this.playheadTickProgress,
     this.playheadStyle,
@@ -250,6 +275,19 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
   // The position that user is currently tapping, null if user let go.
   Offset? _tapPosition;
+
+  // Crosshair (persistent mode) relative-drag anchors and the last
+  // rendered crosshair position (resting default when _tapPosition is null).
+  Offset? _restingCrosshairPos;
+  Offset? _crosshairDragStartFocal;
+  Offset? _crosshairDragStartCrosshair;
+
+  Offset? _placementCursor;
+  List<PlacementPoint> _placementPoints = [];
+  bool _placementConfirmedThisGesture = false;
+
+  Timer? _longPressTimer;
+  Offset? _longPressDownPos;
 
   double? _prevChartWidth; // used by _handleResize
   double? _prevCandleWidth;
@@ -346,6 +384,13 @@ class _InteractiveChartState extends State<InteractiveChart> {
       });
     }
 
+    if (widget.placement != oldWidget.placement) {
+      setState(() {
+        _placementPoints = [];
+        _placementCursor = null;
+      });
+    }
+
     // Replay: when the playhead changes (programmatically or via the
     // built-in drag) the effective length of the chart may shrink.
     // The user-controlled [_startOffset] could then point past the
@@ -382,9 +427,59 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
   @override
   void dispose() {
+    _longPressTimer?.cancel();
     // Detach controller
     widget.controller?.detach();
     super.dispose();
+  }
+
+  bool get _hasActiveOverlayInteraction =>
+      _draggedOverlay != null ||
+      _isDraggingPlayhead ||
+      _isResizingTop ||
+      _isResizingBottom ||
+      _isResizingFibonacci ||
+      _isResizingTrendLine ||
+      _isResizingTrendStart ||
+      _isResizingTrendEnd ||
+      _isResizingPositionEntry ||
+      _isResizingPositionSL ||
+      _isResizingPositionTP ||
+      _isDraggingVerticalLine ||
+      _isResizingFibExtPointA ||
+      _isResizingFibExtPointB ||
+      _isResizingFibExtPointC ||
+      _isResizingFibFanStart ||
+      _isResizingFibFanEnd ||
+      _isResizingArrowStart ||
+      _isResizingArrowEnd ||
+      _isResizingCircleCenter ||
+      _isResizingCircleRadius ||
+      _isDraggingTextTool ||
+      _isResizingGanttStart ||
+      _isResizingGanttEnd;
+
+  void _onPointerDownForLongPress(Offset pos) {
+    _cancelLongPressTimer();
+    if (widget.onCrosshairActiveChanged == null || widget.placement != null) {
+      return;
+    }
+    _longPressDownPos = pos;
+    _longPressTimer = Timer(const Duration(milliseconds: 400), () {
+      _longPressTimer = null;
+      if (_hasActiveOverlayInteraction) return;
+      final activating = !widget.persistentCrosshair;
+      setState(() {
+        _tapPosition = activating ? _longPressDownPos : null;
+      });
+      widget.onCrosshairActiveChanged!(activating);
+    });
+  }
+
+  void _cancelLongPressTimer() {
+    _longPressTimer?.cancel();
+    _longPressTimer = null;
+    _longPressDownPos = null;
   }
 
   /// Fire the [TradingLineOptions.onTap] callback when the user tapped a trading line
@@ -625,6 +720,31 @@ class _InteractiveChartState extends State<InteractiveChart> {
           }
         }
 
+        final Offset? crosshairPos = widget.placement != null
+            ? null
+            : _tapPosition ??
+                (widget.persistentCrosshair
+                    ? _restingCrosshairPosition(
+                        size: size,
+                        visibleCandles: candlesInRange,
+                        xShift: xShift,
+                        maxPrice: maxPrice,
+                        minPrice: minPrice,
+                      )
+                    : null);
+        _restingCrosshairPos = crosshairPos;
+
+        final Offset? placementCursor = widget.placement == null
+            ? null
+            : _placementCursor ??
+                _restingCrosshairPosition(
+                  size: size,
+                  visibleCandles: candlesInRange,
+                  xShift: xShift,
+                  maxPrice: maxPrice,
+                  minPrice: minPrice,
+                );
+
         final child = TweenAnimationBuilder(
           tween: PainterParamsTween(
             end: PainterParams(
@@ -639,7 +759,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
               maxVol: maxVol,
               minVol: minVol,
               xShift: xShift,
-              tapPosition: _tapPosition,
+              tapPosition: crosshairPos,
+              showCrosshairInfoPanel: !widget.persistentCrosshair,
+              placement: widget.placement,
+              placementCursor: placementCursor,
+              placementPoints: _placementPoints,
               leadingTrends: leadingTrends,
               trailingTrends: trailingTrends,
               playheadIndex: phRelInVisible,
@@ -659,6 +783,8 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   getTimeLabel: widget.timeLabel ?? defaultTimeLabel,
                   getPriceLabel: widget.priceLabel ?? defaultPriceLabel,
                   getOverlayInfo: widget.overlayInfo ?? defaultOverlayInfo,
+                  getCrosshairTimeLabel:
+                      widget.crosshairTimeLabel ?? defaultCrosshairTimeLabel,
                   overlays: widget.overlays,
                   indicators: widget.indicators,
                   draggedOverlay: _draggedOverlay,
@@ -694,6 +820,19 @@ class _InteractiveChartState extends State<InteractiveChart> {
         );
 
         final chartWidget = Listener(
+          onPointerDown: (event) {
+            _placementConfirmedThisGesture = false;
+            _onPointerDownForLongPress(event.localPosition);
+          },
+          onPointerMove: (event) {
+            final down = _longPressDownPos;
+            if (down != null &&
+                (event.localPosition - down).distance > kTouchSlop) {
+              _cancelLongPressTimer();
+            }
+          },
+          onPointerUp: (_) => _cancelLongPressTimer(),
+          onPointerCancel: (_) => _cancelLongPressTimer(),
           onPointerSignal: (signal) {
             if (signal is PointerScrollEvent) {
               final dy = signal.scrollDelta.dy;
@@ -736,11 +875,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
           child: GestureDetector(
             // Tap to view candle details or select overlay
             onTapDown: (details) {
-              // Crosshair mode: skip all overlay interactions, just place the crosshair.
-              if (widget.persistentCrosshair) {
+              if (widget.placement != null) {
                 setState(() {
-                  _tapPosition = details.localPosition;
+                  _placementCursor = details.localPosition;
                 });
+                return;
+              }
+              // Crosshair mode: the crosshair is dragged relatively, so a
+              // plain touch-down must NOT teleport it. Just anchor the drag.
+              if (widget.persistentCrosshair) {
+                _crosshairDragStartFocal = details.localPosition;
+                _crosshairDragStartCrosshair = _tapPosition ?? _restingCrosshairPos;
                 return;
               }
               // FIRST-FIRST priority: replay playhead. Claim the
@@ -1136,6 +1281,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
               }
             },
             onTapUp: (_) {
+              if (widget.placement != null) {
+                _confirmPlacementPoint();
+                return;
+              }
               // Crosshair mode: keep the crosshair where the user placed it.
               if (widget.persistentCrosshair) {
                 return;
@@ -1170,11 +1319,16 @@ class _InteractiveChartState extends State<InteractiveChart> {
             },
             // Scale for both zoom and overlay dragging
             onScaleStart: (details) {
-              // Crosshair mode: track the finger as the crosshair position; skip zoom/pan/overlay drag.
-              if (widget.persistentCrosshair) {
+              if (widget.placement != null) {
                 setState(() {
-                  _tapPosition = details.localFocalPoint;
+                  _placementCursor = details.localFocalPoint;
                 });
+                return;
+              }
+              // Crosshair mode: anchor the relative drag; skip zoom/pan/overlay drag.
+              if (widget.persistentCrosshair) {
+                _crosshairDragStartFocal = details.localFocalPoint;
+                _crosshairDragStartCrosshair = _tapPosition ?? _restingCrosshairPos;
                 return;
               }
               // Pinch (multi-finger) gestures ALWAYS pan/zoom — they
@@ -1565,11 +1719,27 @@ class _InteractiveChartState extends State<InteractiveChart> {
               _onScaleStart(details.localFocalPoint);
             },
             onScaleUpdate: (details) {
-              // Crosshair mode: move the crosshair with the finger.
-              if (widget.persistentCrosshair) {
+              if (widget.placement != null) {
                 setState(() {
-                  _tapPosition = details.localFocalPoint;
+                  _placementCursor = details.localFocalPoint;
                 });
+                return;
+              }
+              // Crosshair mode: move the crosshair by the finger's delta
+              // (relative drag), not to the finger's absolute position.
+              if (widget.persistentCrosshair) {
+                final base = _crosshairDragStartCrosshair;
+                final startFocal = _crosshairDragStartFocal;
+                if (base != null && startFocal != null) {
+                  final delta = details.localFocalPoint - startFocal;
+                  final chartH = size.height - widget.style.timeLabelHeight;
+                  setState(() {
+                    _tapPosition = Offset(
+                      (base.dx + delta.dx).clamp(0.0, w),
+                      (base.dy + delta.dy).clamp(0.0, chartH),
+                    );
+                  });
+                }
                 return;
               }
               if (_isDraggingPlayhead) {
@@ -1644,6 +1814,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
               }
             },
             onScaleEnd: (details) {
+              if (widget.placement != null) {
+                _confirmPlacementPoint();
+                return;
+              }
               // Crosshair mode: keep the crosshair at its last position.
               if (widget.persistentCrosshair) {
                 return;
@@ -1934,6 +2108,68 @@ class _InteractiveChartState extends State<InteractiveChart> {
   }
 
   String defaultPriceLabel(double price) => price.toStringAsFixed(2);
+
+  String defaultCrosshairTimeLabel(int timestamp) => intl.DateFormat("EEE d MMM yy · HH:mm")
+      .format(DateTime.fromMillisecondsSinceEpoch(timestamp));
+
+  void _confirmPlacementPoint() {
+    if (_placementConfirmedThisGesture) return;
+    final cursor = _placementCursor;
+    final params = _prevParams;
+    final placement = widget.placement;
+    if (cursor == null || params == null || placement == null) return;
+    _placementConfirmedThisGesture = true;
+
+    final price = params.getPriceFromY(cursor.dy);
+    final ts = params.getTimestampFromX(cursor.dx - params.xShift);
+    if (ts == null) return;
+
+    final point = PlacementPoint(
+      price: price,
+      timestamp: ts,
+      localPosition: cursor,
+    );
+    final points = [..._placementPoints, point];
+
+    if (points.length >= placement.pointCount) {
+      setState(() {
+        _placementPoints = [];
+        _placementCursor = null;
+      });
+      widget.onPlacementComplete?.call(points);
+    } else {
+      setState(() {
+        _placementPoints = points;
+      });
+    }
+  }
+
+  Offset _restingCrosshairPosition({
+    required Size size,
+    required List<CandleData> visibleCandles,
+    required double xShift,
+    required double maxPrice,
+    required double minPrice,
+  }) {
+    final chartWidth = size.width - widget.style.priceLabelWidth;
+    final x = chartWidth / 2;
+
+    final chartHeight = size.height - widget.style.timeLabelHeight;
+    final volumeHeight =
+        widget.style.showVolume ? chartHeight * widget.style.volumeHeightFactor : 0.0;
+    final priceHeight = chartHeight - volumeHeight;
+
+    final idx = ((x - xShift + _candleWidth / 2) ~/ _candleWidth)
+        .clamp(0, visibleCandles.length - 1);
+    final close = visibleCandles[idx].close;
+    final double y;
+    if (close == null || maxPrice == minPrice) {
+      y = priceHeight / 2;
+    } else {
+      y = priceHeight * (maxPrice - close) / (maxPrice - minPrice);
+    }
+    return Offset(x, y);
+  }
 
   Map<String, String> defaultOverlayInfo(CandleData candle) {
     final date = intl.DateFormat.yMMMd()

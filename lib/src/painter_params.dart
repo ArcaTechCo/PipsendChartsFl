@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'chart_style.dart';
 import 'candle_data.dart';
 import 'overlays/playhead_style.dart';
+import 'overlays/drawing_placement.dart';
 
 class PainterParams {
   static bool _volumeWarningShown = false;
@@ -29,6 +30,12 @@ class PainterParams {
 
   final double xShift;
   final Offset? tapPosition;
+  final bool showCrosshairInfoPanel;
+
+  final DrawingPlacement? placement;
+  final Offset? placementCursor;
+  final List<PlacementPoint>? placementPoints;
+
   final List<double?>? leadingTrends;
   final List<double?>? trailingTrends;
 
@@ -67,6 +74,10 @@ class PainterParams {
     required this.tapPosition,
     required this.leadingTrends,
     required this.trailingTrends,
+    this.showCrosshairInfoPanel = true,
+    this.placement,
+    this.placementCursor,
+    this.placementPoints,
     this.fullCandles,
     this.playheadIndex,
     this.playheadTickProgress,
@@ -237,6 +248,10 @@ class PainterParams {
       minVol: lerpField((p) => p.minVol),
       xShift: b.xShift,
       tapPosition: b.tapPosition,
+      showCrosshairInfoPanel: b.showCrosshairInfoPanel,
+      placement: b.placement,
+      placementCursor: b.placementCursor,
+      placementPoints: b.placementPoints,
       leadingTrends: b.leadingTrends,
       trailingTrends: b.trailingTrends,
       playheadIndex: b.playheadIndex,
@@ -259,6 +274,12 @@ class PainterParams {
         minVol != other.minVol) return true;
 
     if (tapPosition != other.tapPosition) return true;
+
+    if (showCrosshairInfoPanel != other.showCrosshairInfoPanel) return true;
+
+    if (placement != other.placement ||
+        placementCursor != other.placementCursor ||
+        placementPoints != other.placementPoints) return true;
 
     if (leadingTrends != other.leadingTrends ||
         trailingTrends != other.trailingTrends) return true;

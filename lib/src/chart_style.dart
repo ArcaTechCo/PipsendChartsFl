@@ -69,6 +69,10 @@ class ChartStyle {
   /// The highlight color. This appears when user clicks on the chart.
   final Color selectionHighlightColor;
 
+  /// Background color of the crosshair price/date axis labels. When null,
+  /// falls back to an opaque version of [selectionHighlightColor].
+  final Color? crosshairLabelColor;
+
   /// Whether to render the crosshair (tap highlight) as thin dashed lines instead of
   /// a solid vertical highlight bar plus a solid horizontal line.
   ///
@@ -143,6 +147,7 @@ class ChartStyle {
     @Deprecated('Use gridStyle.horizontalGridColor instead')
     this.priceGridLineColor,
     this.selectionHighlightColor = const Color(0x33757575),
+    this.crosshairLabelColor,
     this.crosshairDashed = false,
     this.overlayBackgroundColor = const Color(0xEE757575),
     this.candleBorderRadius = 0.0,
@@ -154,4 +159,7 @@ class ChartStyle {
   /// Get the effective horizontal grid color (for backward compatibility).
   Color get effectiveHorizontalGridColor =>
       priceGridLineColor ?? gridStyle.horizontalGridColor;
+
+  Color get effectiveCrosshairLabelColor =>
+      crosshairLabelColor ?? selectionHighlightColor.withValues(alpha: 1.0);
 }
