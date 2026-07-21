@@ -171,6 +171,61 @@ class TextTool extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    if (text.isEmpty) return null;
+    final x = params.fitTimestamp(timestamp);
+    if (x == null) return null;
+    final y = params.fitPrice(price);
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: style.textColor,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          fontStyle: style.fontStyle,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: style.textAlign,
+    )..layout();
+
+    double textX;
+    switch (style.horizontalAlignment) {
+      case TextHorizontalAlignment.left:
+        textX = x;
+        break;
+      case TextHorizontalAlignment.center:
+        textX = x - tp.width / 2;
+        break;
+      case TextHorizontalAlignment.right:
+        textX = x - tp.width;
+        break;
+    }
+    double textY;
+    switch (style.verticalAlignment) {
+      case TextVerticalAlignment.top:
+        textY = y;
+        break;
+      case TextVerticalAlignment.middle:
+        textY = y - tp.height / 2;
+        break;
+      case TextVerticalAlignment.bottom:
+        textY = y - tp.height;
+        break;
+    }
+
+    final pad = style.padding;
+    return Rect.fromLTWH(
+      textX - pad,
+      textY - pad,
+      tp.width + pad * 2,
+      tp.height + pad * 2,
+    );
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
     

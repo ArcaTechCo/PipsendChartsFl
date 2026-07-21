@@ -139,10 +139,7 @@ class ChartPainter extends CustomPainter {
 
     // Draw tap highlight & overlay
     if (params.tapPosition != null) {
-      final tapIdx = params.getCandleIndexFromOffset(params.tapPosition!.dx);
-      if (tapIdx >= 0 && tapIdx < params.candles.length) {
-        _drawTapHighlightAndOverlay(canvas, params);
-      }
+      _drawTapHighlightAndOverlay(canvas, params);
     }
 
     if (params.placement != null) {
@@ -817,7 +814,46 @@ class ChartPainter extends CustomPainter {
         } else {
           overlay.paint(canvas, params, isBeingDragged: false);
         }
+
+        // Selection highlight (drawn on top of the resting overlay).
+        if (params.selectedOverlayId != null &&
+            overlay.id == params.selectedOverlayId) {
+          _drawOverlaySelectionHighlight(canvas, params, overlay);
+        }
       }
+    }
+  }
+
+  /// Draws an emphasized border and corner handles around the selected
+  /// overlay, TradingView-style. Runs inside the xShift-translated canvas, so
+  /// the overlay's content-space [ChartOverlay.selectionBounds] lines up with
+  /// what was painted.
+  void _drawOverlaySelectionHighlight(
+      Canvas canvas, PainterParams params, ChartOverlay overlay) {
+    final bounds = overlay.selectionBounds(params);
+    if (bounds == null) return;
+    // Sit the outline just outside the drawing.
+    final r = bounds.inflate(3.0);
+    final color = params.style.selectionHighlightColor.withValues(alpha: 1.0);
+
+    canvas.drawRect(
+      r,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+
+    final handleFill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final handleStroke = Paint()
+      ..color = const Color(0xFFFFFFFF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    for (final corner in [r.topLeft, r.topRight, r.bottomLeft, r.bottomRight]) {
+      canvas.drawCircle(corner, 5.0, handleFill);
+      canvas.drawCircle(corner, 5.0, handleStroke);
     }
   }
 
@@ -825,17 +861,17 @@ class ChartPainter extends CustomPainter {
   int _calculatePriceLabelCount(PainterParams params) {
     // If manual override, use it
     if (params.style.priceLabelCount != null) {
-      return params.style.priceLabelCount!.clamp(3, 10);
+      return params.style.priceLabelCount!.clamp(3, 20);
     }
-    
+
     // If adaptive disabled, use default
     if (!params.style.adaptiveLabels) {
       return 5; // Current default
     }
-    
-    // Adaptive calculation: ~80px per label
+
+    // Adaptive calculation: ~55px per label
     final height = params.priceHeight;
-    final labelCount = (height / 80).round().clamp(3, 10);
+    final labelCount = (height / 55).round().clamp(3, 20);
     return labelCount;
   }
 
@@ -1163,16 +1199,22 @@ class ChartPainter extends CustomPainter {
 
   void _drawTapHighlightAndOverlay(canvas, PainterParams params) {
     final pos = params.tapPosition!;
-    final i = params
-        .getCandleIndexFromOffset(pos.dx)
-        .clamp(0, params.candles.length - 1);
+    final rawIdx = params.getCandleIndexFromOffset(pos.dx);
+    final hasCandle = rawIdx >= 0 && rawIdx < params.candles.length;
+    final i = rawIdx.clamp(0, params.candles.length - 1);
     final candle = params.candles[i];
     final dashed = params.style.crosshairDashed;
+
+    // X (in canvas space, before the xShift translate) of the vertical line.
+    // Inside the data we snap to the candle center; in the empty space past
+    // the first/last bar we follow the finger so the crosshair stays visible.
+    final double centerX =
+        hasCandle ? i * params.candleWidth : pos.dx - params.xShift;
+
     canvas.save();
     canvas.translate(params.xShift, 0.0);
-    if (dashed) {
-      // Thin dashed vertical line through the center of the selected candle
-      final centerX = i * params.candleWidth;
+    if (dashed || !hasCandle) {
+      // Thin dashed vertical line through the crosshair position
       final paint = Paint()
         ..strokeWidth = 1.0
         ..color = params.style.selectionHighlightColor.withValues(alpha: 0.8)
@@ -1230,18 +1272,26 @@ class ChartPainter extends CustomPainter {
       );
     }
 
-    final lineX = i * params.candleWidth + params.xShift;
-    _drawCrosshairChip(
-      canvas,
-      getCrosshairTimeLabel(candle.timestamp),
-      params.style.timeLabelStyle,
-      params.style.effectiveCrosshairLabelColor,
-      centerY: params.chartHeight + params.style.timeLabelHeight / 2,
-      centerX: lineX,
-      clampWithin: params.chartWidth,
-    );
+    final lineX = centerX + params.xShift;
+    // Inside the data the time comes from the selected candle; in empty space
+    // we extrapolate the timestamp from the crosshair X so the label keeps
+    // updating past the last bar.
+    final int? labelTimestamp =
+        hasCandle ? candle.timestamp : params.getTimestampFromX(centerX);
+    if (labelTimestamp != null) {
+      _drawCrosshairChip(
+        canvas,
+        getCrosshairTimeLabel(labelTimestamp),
+        params.style.timeLabelStyle,
+        params.style.effectiveCrosshairLabelColor,
+        centerY: params.chartHeight + params.style.timeLabelHeight / 2,
+        centerX: lineX,
+        clampWithin: params.chartWidth,
+      );
+    }
 
-    if (params.showCrosshairInfoPanel) {
+    // The OHLC info panel needs a real candle, so it only shows inside the data.
+    if (params.showCrosshairInfoPanel && hasCandle) {
       _drawTapInfoOverlay(canvas, params, candle);
     }
   }

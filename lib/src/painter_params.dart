@@ -32,6 +32,11 @@ class PainterParams {
   final Offset? tapPosition;
   final bool showCrosshairInfoPanel;
 
+  /// Id of the overlay currently selected by the host (tapped without a
+  /// drag). The painter highlights the matching overlay. Null when nothing
+  /// is selected.
+  final String? selectedOverlayId;
+
   final DrawingPlacement? placement;
   final Offset? placementCursor;
   final List<PlacementPoint>? placementPoints;
@@ -74,6 +79,7 @@ class PainterParams {
     required this.tapPosition,
     required this.leadingTrends,
     required this.trailingTrends,
+    this.selectedOverlayId,
     this.showCrosshairInfoPanel = true,
     this.placement,
     this.placementCursor,
@@ -248,6 +254,7 @@ class PainterParams {
       minVol: lerpField((p) => p.minVol),
       xShift: b.xShift,
       tapPosition: b.tapPosition,
+      selectedOverlayId: b.selectedOverlayId,
       showCrosshairInfoPanel: b.showCrosshairInfoPanel,
       placement: b.placement,
       placementCursor: b.placementCursor,
@@ -274,6 +281,8 @@ class PainterParams {
         minVol != other.minVol) return true;
 
     if (tapPosition != other.tapPosition) return true;
+
+    if (selectedOverlayId != other.selectedOverlayId) return true;
 
     if (showCrosshairInfoPanel != other.showCrosshairInfoPanel) return true;
 

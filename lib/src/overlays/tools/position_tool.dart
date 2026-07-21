@@ -285,6 +285,22 @@ class PositionTool extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    final ys = [
+      params.fitPrice(entryPrice),
+      params.fitPrice(stopLossPrice),
+      params.fitPrice(takeProfitPrice),
+    ];
+    var top = ys.first;
+    var bottom = ys.first;
+    for (final v in ys) {
+      if (v < top) top = v;
+      if (v > bottom) bottom = v;
+    }
+    return Rect.fromLTRB(0, top, params.chartWidth, bottom);
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
 

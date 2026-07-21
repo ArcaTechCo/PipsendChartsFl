@@ -43,6 +43,7 @@ export 'src/indicators/adx_indicator.dart';
 export 'src/indicators/cci_indicator.dart';
 export 'src/indicators/williams_r_indicator.dart';
 export 'src/indicators/obv_indicator.dart';
+export 'src/indicators/fractals_indicator.dart';
 
 // Replay Playhead
 export 'src/overlays/playhead_style.dart';

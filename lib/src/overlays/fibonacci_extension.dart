@@ -237,6 +237,17 @@ class FibonacciExtension extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    final a = Offset(
+        params.fitTimestamp(pointATime) ?? 0, params.fitPrice(pointAPrice));
+    final b = Offset(
+        params.fitTimestamp(pointBTime) ?? 0, params.fitPrice(pointBPrice));
+    final c = Offset(
+        params.fitTimestamp(pointCTime) ?? 0, params.fitPrice(pointCPrice));
+    return Rect.fromPoints(a, b).expandToInclude(Rect.fromPoints(c, c));
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
     

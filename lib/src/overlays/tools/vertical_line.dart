@@ -187,6 +187,13 @@ class VerticalLine extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    final x = params.fitTimestamp(timestamp);
+    if (x == null) return null;
+    return Rect.fromLTRB(x, 0, x, params.chartHeight);
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
 

@@ -138,6 +138,19 @@ class CircleTool extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    final centerX = params.fitTimestamp(centerTime) ?? 0;
+    final edgeX = params.fitTimestamp(centerTime + radiusTime);
+    final radiusX = edgeX != null
+        ? (edgeX - centerX).abs()
+        : radiusTime / (24 * 60 * 60 * 1000) * params.candleWidth;
+    return Rect.fromPoints(
+      Offset(centerX - radiusX, params.fitPrice(centerPrice + radiusPrice)),
+      Offset(centerX + radiusX, params.fitPrice(centerPrice - radiusPrice)),
+    );
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
     

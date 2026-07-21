@@ -110,7 +110,7 @@ class ChartStyle {
   /// Number of price labels to display (vertical axis).
   ///
   /// If null and adaptiveLabels is true, calculates automatically based on chart height.
-  /// Range: 3-10
+  /// Range: 3-20
   /// Default: null (adaptive)
   final int? priceLabelCount;
 

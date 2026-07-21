@@ -174,6 +174,16 @@ class GanttTool extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    final x1 = params.fitTimestamp(startTime) ?? 0;
+    final x2 = params.fitTimestamp(endTime) ?? params.chartWidth;
+    return Rect.fromPoints(
+      Offset(x1, params.fitPrice(price + height / 2)),
+      Offset(x2, params.fitPrice(price - height / 2)),
+    );
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
     

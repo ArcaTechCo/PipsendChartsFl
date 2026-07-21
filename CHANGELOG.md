@@ -1,3 +1,57 @@
+## 1.6.0
+
+**Tap-to-Select Drawings, Crosshair Beyond the Data & Fractals Indicator**
+
+### Overlay selection (TradingView-style)
+* **`InteractiveChart.onOverlayTapped`** (`ValueChanged<ChartOverlay?>`) — fires with the tapped interactive overlay when the user taps one without dragging, and with `null` when tapping empty chart space. Lets the host build tap-to-select + quick actions (delete, edit, …).
+* **`InteractiveChart.selectedOverlayId`** — id of the currently selected overlay; the painter highlights it with an emphasized border and corner handles.
+* **`InteractiveChart.onSelectedOverlayRectChanged`** (`ValueChanged<Rect?>`) — reports the selected overlay's local bounding rect, updated as the chart pans/zooms, so the host can keep a floating toolbar glued to it.
+* **`ChartOverlay.selectionBounds(params)`** — new overridable method returning the overlay's content-space bounds. Implemented for price zones, trend lines, Fibonacci (retracement / extension / fan), arrows, rulers, circles, gantt, text, vertical lines and position tools. **`PriceZone.boundingRect(params)`** is also exposed.
+
+### Crosshair
+* **Works beyond the first/last candle** — the crosshair (and its price/time labels) now follows the finger into the empty space past the data instead of disappearing; the time label is extrapolated from the average candle spacing. The OHLC info panel is only shown while over a real candle.
+
+### Indicators
+* **`FractalsIndicator`** — Bill Williams fractals (up/down markers), with `FractalsStyle`.
+
+### Backwards Compatibility
+* All changes are additive. New parameters default to `null`, so charts written for 1.5.0 behave exactly the same.
+
+---
+
+## 1.5.0
+
+**Always-On Crosshair, Drawing Placement Mode & Price-Axis Scaling**
+
+### Crosshair
+* **Always visible in persistent mode** — when `persistentCrosshair` is on, the crosshair now shows from the start at a resting position (no first tap needed).
+* **Relative drag** — dragging moves the crosshair by the finger's delta from its current position, instead of teleporting to the touch point.
+* **Highlighted date label** on the bottom (time) axis, mirroring the price label on the right — so the crosshair always shows both "when" and "at what price", TradingView-style.
+* **`InteractiveChart.crosshairTimeLabel`** (`CrosshairTimeLabelGetter`) — formats the crosshair's date/time readout. Defaults to a locale-aware `"EEE d MMM yy · HH:mm"`.
+* **`ChartStyle.crosshairLabelColor`** — background color of the crosshair price/date axis labels. Defaults to an opaque version of `selectionHighlightColor`; label text auto-contrasts (black/white) for readability.
+* In persistent mode the floating OHLC info panel is hidden — only the lines and axis labels are drawn.
+* Fixed: the dashed crosshair line and the date label now align to the candle center.
+
+### Long-press toggle
+* **`InteractiveChart.onCrosshairActiveChanged`** — a long-press on empty chart area toggles the crosshair on/off (the host reflects the requested state back via `persistentCrosshair`). Detected without competing with overlay resize/drag gestures.
+
+### Drawing placement mode (TradingView-style)
+* **`InteractiveChart.placement`** (`DrawingPlacement`) + **`onPlacementComplete`** (`List<PlacementPoint>`) — enter a placement session: an interactive blue crosshair with a center dot is shown, the user places `pointCount` points (tap or drag-release each) with a live preview, and the confirmed points (price + timestamp) are returned so the host builds the real drawing.
+* New types: **`DrawingPlacement`** (`pointCount`, `preview`, `color`), **`PlacementPoint`** (`price`, `timestamp`, `localPosition`), **`PlacementPreviewShape`** (`none` / `rectangle` / `line`).
+
+### Price-axis Y scaling
+* **Drag on the price scale** (right gutter) with one finger to scale the Y axis (zoom the price range).
+* **Double-tap the price scale** to reset to auto-fit.
+* The vertical zoom now applies whenever it has been changed (not only when `enableVerticalPan` is enabled), so price-axis scaling works standalone.
+
+### Price labels
+* Denser adaptive price labels (~55px per label, up to 20; was ~80px, max 10). `ChartStyle.priceLabelCount` range is now 3–20.
+
+### Backwards Compatibility
+* All changes are additive. New parameters default to `null`/`false`, so charts written for 1.4.0 behave exactly the same.
+
+---
+
 ## 1.4.0
 
 **Replay Mode — Playhead, Tick Progress & Programmatic Seeking**

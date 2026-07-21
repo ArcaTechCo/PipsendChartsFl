@@ -36,6 +36,14 @@ abstract class ChartOverlay {
     return false; // Default implementation
   }
 
+  /// Bounding rectangle of this overlay in chart-content coordinates (before
+  /// the painter's [PainterParams.xShift] translation).
+  ///
+  /// Used to draw the selection highlight and to anchor a host-side selection
+  /// toolbar. Returns `null` when the overlay has no meaningful bounds (or is
+  /// off-screen), in which case no selection UI is shown.
+  Rect? selectionBounds(PainterParams params) => null;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

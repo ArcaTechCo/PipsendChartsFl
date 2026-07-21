@@ -217,6 +217,24 @@ class InteractiveChart extends StatefulWidget {
   /// [PlayheadStyle.draggable] is true.
   final ValueChanged<PlayheadInfo>? onPlayheadChanged;
 
+  /// Fired when the user taps (without dragging) on an interactive overlay,
+  /// with the tapped overlay; and with `null` when the user taps empty chart
+  /// space. Hosts use it to drive a TradingView-style selection + quick
+  /// actions (delete, edit, ...). See [selectedOverlayId].
+  final ValueChanged<ChartOverlay?>? onOverlayTapped;
+
+  /// Id of the overlay currently selected by the host. The painter highlights
+  /// the matching overlay (emphasized border + handles). Null when nothing is
+  /// selected.
+  final String? selectedOverlayId;
+
+  /// Fired with the local-coordinate bounding rect of the overlay named by
+  /// [selectedOverlayId], updated as the chart pans/zooms so the host can keep
+  /// a floating toolbar glued to it. Fires `null` when nothing is selected or
+  /// the selected overlay is no longer present/visible. Currently emitted for
+  /// [PriceZone] overlays.
+  final ValueChanged<Rect?>? onSelectedOverlayRectChanged;
+
   const InteractiveChart({
     Key? key,
     required this.candles,
@@ -246,6 +264,9 @@ class InteractiveChart extends StatefulWidget {
     this.playheadTickProgress,
     this.playheadStyle,
     this.onPlayheadChanged,
+    this.onOverlayTapped,
+    this.selectedOverlayId,
+    this.onSelectedOverlayRectChanged,
   })  : this.style = style ?? const ChartStyle(),
         assert(candles.length >= 3,
             "InteractiveChart requires 3 or more CandleData"),
@@ -294,6 +315,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
   double? _prevStartOffset;
   Offset? _initialFocalPoint;
   PainterParams? _prevParams; // used in onTapUp event
+
+  // Last selection rect reported to the host via
+  // [onSelectedOverlayRectChanged], used to avoid redundant callbacks.
+  Rect? _lastReportedSelectionRect;
+  bool _hasReportedSelectionRect = false;
 
   // Captured on every tap-down regardless of [enableInteraction]. Used by
   // [_fireOnTapEvent] so hosts can subscribe to "tap on empty area"
@@ -347,6 +373,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
   late double _verticalZoomFactor; // 1.0 = fit to screen, >1.0 = zoomed out (more padding)
   double _verticalPanOffset = 0.0; // Vertical pan offset in price units
   double? _prevVerticalPanOffset;
+
+  bool _isScalingPriceAxis = false;
+  Offset? _priceAxisScaleStartFocal;
+  double? _priceAxisScaleStartZoom;
+  Duration? _lastGutterTapTime;
+  Offset? _lastGutterTapPos;
 
   // Replay playhead drag state. When true the current scale gesture
   // is being interpreted as a playhead drag (instead of pan/zoom or
@@ -492,6 +524,37 @@ class _InteractiveChartState extends State<InteractiveChart> {
     if (overlay is TradingLine) {
       overlay.options.onTap?.call();
     }
+    // Generic selection report for any interactive overlay (zones, trend
+    // lines, ...). Hosts use this to drive tap-to-select + quick actions.
+    widget.onOverlayTapped?.call(overlay);
+  }
+
+  /// Computes the current local-coordinate bounding rect of the selected
+  /// overlay and, when it changed, forwards it to
+  /// [InteractiveChart.onSelectedOverlayRectChanged] after the frame so the
+  /// host can position a floating toolbar without setState-during-build.
+  void _reportSelectionRect(PainterParams params) {
+    final cb = widget.onSelectedOverlayRectChanged;
+    if (cb == null) return;
+
+    Rect? rect;
+    final id = widget.selectedOverlayId;
+    if (id != null) {
+      for (final overlay in widget.overlays) {
+        if (overlay.id != id || !overlay.visible) continue;
+        // selectionBounds is in content space; add xShift for screen space.
+        final bounds = overlay.selectionBounds(params);
+        if (bounds != null) rect = bounds.translate(params.xShift, 0);
+        break;
+      }
+    }
+
+    if (_hasReportedSelectionRect && rect == _lastReportedSelectionRect) return;
+    _lastReportedSelectionRect = rect;
+    _hasReportedSelectionRect = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) cb(rect);
+    });
   }
 
   /// Jump to the latest candle (most recent data)
@@ -687,8 +750,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
             ? lowValues.reduce(min)
             : 0.0; // Default value when no data visible
         
-        // Apply vertical zoom and pan (only if enabled)
-        if (widget.enableVerticalPan) {
+        // Apply vertical zoom and pan (when the free camera is enabled, or
+        // once the user has scaled/panned the price axis by dragging on it).
+        if (widget.enableVerticalPan ||
+            _verticalZoomFactor != 1.0 ||
+            _verticalPanOffset != 0.0) {
           // Zoom factor > 1.0 adds padding (zooms out), < 1.0 zooms in
           final priceRange = maxPrice - minPrice;
           final paddingFactor = (_verticalZoomFactor - 1.0) / 2.0; // Split padding top/bottom
@@ -745,31 +811,38 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   minPrice: minPrice,
                 );
 
+        final endParams = PainterParams(
+          candles: candlesInRange,
+          fullCandles: widget.playheadIndex != null ? widget.candles : null,
+          style: widget.style,
+          size: size,
+          candleWidth: _candleWidth,
+          startOffset: _startOffset,
+          maxPrice: maxPrice,
+          minPrice: minPrice,
+          maxVol: maxVol,
+          minVol: minVol,
+          xShift: xShift,
+          tapPosition: crosshairPos,
+          selectedOverlayId: widget.selectedOverlayId,
+          showCrosshairInfoPanel: !widget.persistentCrosshair,
+          placement: widget.placement,
+          placementCursor: placementCursor,
+          placementPoints: _placementPoints,
+          leadingTrends: leadingTrends,
+          trailingTrends: trailingTrends,
+          playheadIndex: phRelInVisible,
+          playheadTickProgress: widget.playheadTickProgress,
+          playheadStyle: widget.playheadStyle,
+        );
+
+        // Report the selected overlay's screen rect so the host can keep a
+        // floating toolbar glued to it as the chart pans/zooms.
+        _reportSelectionRect(endParams);
+
         final child = TweenAnimationBuilder(
           tween: PainterParamsTween(
-            end: PainterParams(
-              candles: candlesInRange,
-              fullCandles: widget.playheadIndex != null ? widget.candles : null,
-              style: widget.style,
-              size: size,
-              candleWidth: _candleWidth,
-              startOffset: _startOffset,
-              maxPrice: maxPrice,
-              minPrice: minPrice,
-              maxVol: maxVol,
-              minVol: minVol,
-              xShift: xShift,
-              tapPosition: crosshairPos,
-              showCrosshairInfoPanel: !widget.persistentCrosshair,
-              placement: widget.placement,
-              placementCursor: placementCursor,
-              placementPoints: _placementPoints,
-              leadingTrends: leadingTrends,
-              trailingTrends: trailingTrends,
-              playheadIndex: phRelInVisible,
-              playheadTickProgress: widget.playheadTickProgress,
-              playheadStyle: widget.playheadStyle,
-            ),
+            end: endParams,
           ),
           duration: Duration(milliseconds: 300),
           curve: Curves.easeOut,
@@ -822,6 +895,21 @@ class _InteractiveChartState extends State<InteractiveChart> {
         final chartWidget = Listener(
           onPointerDown: (event) {
             _placementConfirmedThisGesture = false;
+            if (event.localPosition.dx >= w) {
+              final prevPos = _lastGutterTapPos;
+              final prevTime = _lastGutterTapTime;
+              if (prevPos != null &&
+                  prevTime != null &&
+                  (event.timeStamp - prevTime).inMilliseconds < 300 &&
+                  (event.localPosition - prevPos).distance < 40) {
+                _lastGutterTapPos = null;
+                _lastGutterTapTime = null;
+                resetVerticalView();
+              } else {
+                _lastGutterTapPos = event.localPosition;
+                _lastGutterTapTime = event.timeStamp;
+              }
+            }
             _onPointerDownForLongPress(event.localPosition);
           },
           onPointerMove: (event) {
@@ -1307,8 +1395,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
                   _originalPrice = null;
                   _hasDragged = false;
                 });
-              } else if (_draggedOverlay == null && widget.onTap != null) {
-                _fireOnTapEvent();
+              } else if (_draggedOverlay == null) {
+                // Tap on empty chart space: deselect any selected overlay.
+                widget.onOverlayTapped?.call(null);
+                if (widget.onTap != null) _fireOnTapEvent();
               }
               // Clear tap position if interaction is enabled, unless the crosshair should persist.
               if (widget.enableInteraction && !widget.persistentCrosshair) {
@@ -1319,10 +1409,18 @@ class _InteractiveChartState extends State<InteractiveChart> {
             },
             // Scale for both zoom and overlay dragging
             onScaleStart: (details) {
+              _isScalingPriceAxis = false;
               if (widget.placement != null) {
                 setState(() {
                   _placementCursor = details.localFocalPoint;
                 });
+                return;
+              }
+              if (details.pointerCount == 1 &&
+                  details.localFocalPoint.dx >= w) {
+                _isScalingPriceAxis = true;
+                _priceAxisScaleStartFocal = details.localFocalPoint;
+                _priceAxisScaleStartZoom = _verticalZoomFactor;
                 return;
               }
               // Crosshair mode: anchor the relative drag; skip zoom/pan/overlay drag.
@@ -1725,6 +1823,20 @@ class _InteractiveChartState extends State<InteractiveChart> {
                 });
                 return;
               }
+              if (_isScalingPriceAxis) {
+                final start = _priceAxisScaleStartFocal;
+                final startZoom = _priceAxisScaleStartZoom;
+                if (start != null && startZoom != null && _prevParams != null) {
+                  final dy = details.localFocalPoint.dy - start.dy;
+                  final priceHeight = _prevParams!.priceHeight;
+                  final factor = (startZoom + (dy / priceHeight) * 1.5)
+                      .clamp(0.5, 3.0);
+                  setState(() {
+                    _verticalZoomFactor = factor;
+                  });
+                }
+                return;
+              }
               // Crosshair mode: move the crosshair by the finger's delta
               // (relative drag), not to the finger's absolute position.
               if (widget.persistentCrosshair) {
@@ -1816,6 +1928,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
             onScaleEnd: (details) {
               if (widget.placement != null) {
                 _confirmPlacementPoint();
+                return;
+              }
+              if (_isScalingPriceAxis) {
+                _isScalingPriceAxis = false;
                 return;
               }
               // Crosshair mode: keep the crosshair at its last position.

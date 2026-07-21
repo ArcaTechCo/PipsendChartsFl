@@ -74,6 +74,22 @@ class PriceZone extends ChartOverlay {
     return params.chartWidth;
   }
 
+  /// Bounding rectangle of the zone in chart-content coordinates (before the
+  /// painter's [PainterParams.xShift] translation). Used to draw the selection
+  /// highlight and to anchor a host-side selection toolbar.
+  Rect boundingRect(PainterParams params) {
+    final startX = _getStartX(params);
+    final endX = _getEndX(params);
+    final minY = params.fitPrice(maxPrice); // Y is inverted
+    final maxY = params.fitPrice(minPrice);
+    final left = startX < endX ? startX : endX;
+    final right = startX > endX ? startX : endX;
+    return Rect.fromLTRB(left, minY, right, maxY);
+  }
+
+  @override
+  Rect? selectionBounds(PainterParams params) => boundingRect(params);
+
   @override
   void paint(Canvas canvas, PainterParams params, {bool isBeingDragged = false}) {
     if (!visible) return;

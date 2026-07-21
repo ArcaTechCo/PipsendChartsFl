@@ -183,6 +183,19 @@ class FibonacciRetracement extends ChartOverlay {
   }
 
   @override
+  Rect? selectionBounds(PainterParams params) {
+    final startX =
+        startTime != null ? (params.fitTimestamp(startTime!) ?? 0) : 0.0;
+    final endX = endTime != null
+        ? (params.fitTimestamp(endTime!) ?? params.chartWidth)
+        : params.chartWidth;
+    return Rect.fromPoints(
+      Offset(startX, params.fitPrice(highPrice)),
+      Offset(endX, params.fitPrice(lowPrice)),
+    );
+  }
+
+  @override
   bool hitTest(Offset position, PainterParams params) {
     if (!interactive) return false;
 
