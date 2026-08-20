@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'chart_type.dart';
 import 'grid_style.dart';
 
 class ChartStyle {
@@ -29,6 +30,22 @@ class ChartStyle {
   ///
   /// This appears when user clicks on the chart.
   final TextStyle overlayTextStyle;
+
+  /// How the main price series is rendered.
+  ///
+  /// Defaults to [ChartType.candlestick]. [ChartType.heikinAshi] makes the
+  /// chart derive smoothed OHLC values from the candles it was given, which
+  /// also affects indicators, the price axis and the crosshair overlay.
+  final ChartType chartType;
+
+  /// Stroke width of the price line, used when [chartType] is
+  /// [ChartType.line].
+  final double lineWidth;
+
+  /// Color of the price line, used when [chartType] is [ChartType.line].
+  ///
+  /// Falls back to [priceGainColor] when null.
+  final Color? lineColor;
 
   /// The color to use when the `close` price is higher than `open` price.
   final Color priceGainColor;
@@ -138,6 +155,9 @@ class ChartStyle {
       fontSize: 16,
       color: Colors.white,
     ),
+    this.chartType = ChartType.candlestick,
+    this.lineWidth = 1.6,
+    this.lineColor,
     this.priceGainColor = Colors.green,
     this.priceLossColor = Colors.red,
     this.showVolume = true,
@@ -157,6 +177,8 @@ class ChartStyle {
   });
 
   /// Get the effective horizontal grid color (for backward compatibility).
+  Color get effectiveLineColor => lineColor ?? priceGainColor;
+
   Color get effectiveHorizontalGridColor =>
       priceGridLineColor ?? gridStyle.horizontalGridColor;
 

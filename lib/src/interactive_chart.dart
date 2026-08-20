@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'candle_data.dart';
+import 'chart_type.dart';
 import 'chart_painter.dart';
 import 'chart_style.dart';
 import 'painter_params.dart';
@@ -342,6 +343,25 @@ class _InteractiveChartState extends State<InteractiveChart> {
   bool _hasDragged = false; // Track if user actually dragged
   
   // Resize state for zones and fibonacci
+
+  // Heikin Ashi candles are derived from the whole series (the HA open is
+  // recursive), so they are cached and only recomputed when the source list
+  // changes. Panning and zooming do not rebuild the parent, so the cache
+  // survives interaction.
+  List<CandleData>? _heikinAshiCache;
+  List<CandleData>? _heikinAshiSource;
+
+  /// The candle series that is actually rendered, measured and fed to the
+  /// indicators. Identical to `widget.candles` unless Heikin Ashi is active.
+  List<CandleData> get _candles {
+    if (widget.style.chartType != ChartType.heikinAshi) return widget.candles;
+    if (!identical(_heikinAshiSource, widget.candles)) {
+      _heikinAshiSource = widget.candles;
+      _heikinAshiCache = CandleData.toHeikinAshi(widget.candles);
+    }
+    return _heikinAshiCache!;
+  }
+
   bool _isResizingTop = false; // Resizing top edge (maxPrice/highPrice)
   bool _isResizingBottom = false; // Resizing bottom edge (minPrice/lowPrice)
   bool _isResizingFibonacci = false; // Track if resizing a Fibonacci
@@ -387,10 +407,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
   /// The effective number of candles "available" to the chart. In
   /// replay mode (when [InteractiveChart.playheadIndex] is set) this
-  /// is `playheadIndex + 1`; otherwise it is `widget.candles.length`.
+  /// is `playheadIndex + 1`; otherwise it is `_candles.length`.
   int get _effectiveLength => widget.playheadIndex != null
       ? widget.playheadIndex! + 1
-      : widget.candles.length;
+      : _candles.length;
 
   @override
   void initState() {
@@ -591,11 +611,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
   /// Same as [seekToIndex] but accepts a timestamp. Finds the closest
   /// candle whose timestamp is `<=` the given value.
   void seekToTimestamp(int timestamp) {
-    if (widget.candles.isEmpty) return;
+    if (_candles.isEmpty) return;
     int lo = 0, hi = _effectiveLength - 1;
     while (lo < hi) {
       final mid = (lo + hi + 1) ~/ 2;
-      if (widget.candles[mid].timestamp <= timestamp) {
+      if (_candles[mid].timestamp <= timestamp) {
         lo = mid;
       } else {
         hi = mid - 1;
@@ -663,12 +683,12 @@ class _InteractiveChartState extends State<InteractiveChart> {
         
         // Check if new candles were added to the beginning of the list
         if (_prevCandlesLength != null && 
-            widget.candles.length > _prevCandlesLength!) {
-          final candlesAdded = widget.candles.length - _prevCandlesLength!;
+            _candles.length > _prevCandlesLength!) {
+          final candlesAdded = _candles.length - _prevCandlesLength!;
           // Adjust offset to maintain visual position
           _startOffset += candlesAdded * _candleWidth;
         }
-        _prevCandlesLength = widget.candles.length;
+        _prevCandlesLength = _candles.length;
 
         // Find the visible data range. In replay mode the effective
         // length stops at the playhead — we never render or include
@@ -689,10 +709,10 @@ class _InteractiveChartState extends State<InteractiveChart> {
         // Notify offset change if callback is provided
         _notifyOffsetChanged(start, end);
 
-        final candlesInRange = widget.candles.getRange(start, end).toList();
+        final candlesInRange = _candles.getRange(start, end).toList();
         if (end < effLen) {
           // Put in an extra item, since it can become visible when scrolling
-          final nextItem = widget.candles[end];
+          final nextItem = _candles[end];
           candlesInRange.add(nextItem);
         }
 
@@ -705,7 +725,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
           final phRel = widget.playheadIndex! - start;
           if (phRel >= 0 && phRel < candlesInRange.length) {
             candlesInRange[phRel] = CandleData.buildPartial(
-              widget.candles[widget.playheadIndex!],
+              _candles[widget.playheadIndex!],
               widget.playheadTickProgress!,
             );
           }
@@ -713,9 +733,9 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
         // If possible, find neighbouring trend line data,
         // so the chart could draw better-connected lines
-        final leadingTrends = widget.candles.at(start - 1)?.trends;
+        final leadingTrends = _candles.at(start - 1)?.trends;
         final trailingTrends =
-            (end + 1 < effLen) ? widget.candles.at(end + 1)?.trends : null;
+            (end + 1 < effLen) ? _candles.at(end + 1)?.trends : null;
 
         // Find the horizontal shift needed when drawing the candles.
         // First, always shift the chart by half a candle, because when we
@@ -727,13 +747,17 @@ class _InteractiveChartState extends State<InteractiveChart> {
         final xShift = halfCandle - fractionCandle;
 
         // Calculate min and max among the visible data
+        final boundByClose = widget.style.chartType == ChartType.line;
+
         double? highest(CandleData c) {
+          if (boundByClose) return c.close;
           if (c.high != null) return c.high;
           if (c.open != null && c.close != null) return max(c.open!, c.close!);
           return c.open ?? c.close;
         }
 
         double? lowest(CandleData c) {
+          if (boundByClose) return c.close;
           if (c.low != null) return c.low;
           if (c.open != null && c.close != null) return min(c.open!, c.close!);
           return c.open ?? c.close;
@@ -813,7 +837,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
         final endParams = PainterParams(
           candles: candlesInRange,
-          fullCandles: widget.playheadIndex != null ? widget.candles : null,
+          fullCandles: widget.playheadIndex != null ? _candles : null,
           style: widget.style,
           size: size,
           candleWidth: _candleWidth,
@@ -2091,7 +2115,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
   /// upper bound here, because `_effectiveLength` is derived from the
   /// CURRENT playhead — clamping to it would forbid forward movement
   /// entirely. The drag is the act of choosing a new playhead, so the
-  /// real bound is the loaded candle buffer, `widget.candles.length - 1`.
+  /// real bound is the loaded candle buffer, `_candles.length - 1`.
   void _onPlayheadDrag(Offset position) {
     final params = _prevParams;
     if (params == null) return;
@@ -2104,15 +2128,15 @@ class _InteractiveChartState extends State<InteractiveChart> {
     final absIdxF = relIdxF + visibleStart;
     final clampedIdx = absIdxF
         .round()
-        .clamp(0, max(0, widget.candles.length - 1))
+        .clamp(0, max(0, _candles.length - 1))
         .toInt();
 
     // Interpolated timestamp for the host's "fine" label.
     final interp = params.getTimestampFromX(position.dx - params.xShift) ??
-        widget.candles[clampedIdx].timestamp;
+        _candles[clampedIdx].timestamp;
     cb(PlayheadInfo(
       candleIndex: clampedIdx,
-      candleTimestamp: widget.candles[clampedIdx].timestamp,
+      candleTimestamp: _candles[clampedIdx].timestamp,
       interpolatedTimestamp: interp,
     ));
   }

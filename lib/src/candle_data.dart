@@ -1,3 +1,5 @@
+import 'dart:math';
+
 class CandleData {
   /// The timestamp of this data point, in milliseconds since epoch.
   final int timestamp;
@@ -68,6 +70,58 @@ class CandleData {
         result.add(null);
       }
     }
+    return result;
+  }
+
+  /// Converts a series of regular candles into Heikin Ashi candles.
+  ///
+  /// The Heikin Ashi open is recursive (it depends on the previous Heikin
+  /// Ashi candle), so this must always run over the *whole* series rather
+  /// than over the visible window — otherwise the candles would change
+  /// shape as the user scrolls.
+  ///
+  /// Candles without an `open` or `close` are passed through untouched and
+  /// reset the recursion, so gaps in the data stay gaps.
+  static List<CandleData> toHeikinAshi(List<CandleData> data) {
+    if (data.isEmpty) return const [];
+
+    final result = <CandleData>[];
+    double? prevOpen;
+    double? prevClose;
+
+    for (final candle in data) {
+      final open = candle.open;
+      final close = candle.close;
+
+      if (open == null || close == null) {
+        result.add(candle);
+        prevOpen = null;
+        prevClose = null;
+        continue;
+      }
+
+      final high = candle.high ?? max(open, close);
+      final low = candle.low ?? min(open, close);
+
+      final haClose = (open + high + low + close) / 4;
+      final haOpen = (prevOpen == null || prevClose == null)
+          ? (open + close) / 2
+          : (prevOpen + prevClose) / 2;
+
+      result.add(CandleData(
+        timestamp: candle.timestamp,
+        open: haOpen,
+        high: max(high, max(haOpen, haClose)),
+        low: min(low, min(haOpen, haClose)),
+        close: haClose,
+        volume: candle.volume,
+        trends: candle.trends,
+      ));
+
+      prevOpen = haOpen;
+      prevClose = haClose;
+    }
+
     return result;
   }
 

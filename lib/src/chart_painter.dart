@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import 'candle_data.dart';
+import 'chart_type.dart';
 import 'painter_params.dart';
 import 'grid_style.dart';
 import 'overlays/overlay.dart';
@@ -118,6 +119,9 @@ class ChartPainter extends CustomPainter {
     canvas.clipRect(Offset(-params.xShift, 0) & Size(params.chartWidth, params.chartHeight));
     for (int i = 0; i < params.candles.length; i++) {
       _drawSingleDay(canvas, params, i);
+    }
+    if (params.style.chartType == ChartType.line) {
+      _drawPriceLine(canvas, params);
     }
     canvas.restore();
     
@@ -1096,49 +1100,39 @@ class ChartPainter extends CustomPainter {
       final color = open > close
           ? params.style.priceLossColor
           : params.style.priceGainColor;
-      
-      final openY = params.fitPrice(open);
-      final closeY = params.fitPrice(close);
-      
-      // Draw candle body (open-close) with optional rounded corners
-      if (borderRadius > 0 && thickWidth > 2) {
-        // Use rounded rectangle for thicker candles
-        final rect = Rect.fromLTRB(
-          x - thickWidth / 2,
-          min(openY, closeY),
-          x + thickWidth / 2,
-          max(openY, closeY),
-        );
-        final rrect = RRect.fromRectAndRadius(
-          rect,
-          Radius.circular(min(borderRadius, thickWidth / 2)),
-        );
-        canvas.drawRRect(
-          rrect,
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.fill,
-        );
-      } else {
-        // Use line for thin candles or when borderRadius is 0
-        canvas.drawLine(
-          Offset(x, openY),
-          Offset(x, closeY),
-          Paint()
-            ..strokeWidth = thickWidth
-            ..color = color,
-        );
-      }
-      
-      // Draw wicks (high-low) - always as thin lines
-      if (high != null && low != null) {
-        canvas.drawLine(
-          Offset(x, params.fitPrice(high)),
-          Offset(x, params.fitPrice(low)),
-          Paint()
-            ..strokeWidth = thinWidth
-            ..color = color,
-        );
+
+      switch (params.style.chartType) {
+        case ChartType.candlestick:
+        case ChartType.heikinAshi:
+          _drawCandleBody(
+            canvas,
+            params,
+            x: x,
+            open: open,
+            close: close,
+            high: high,
+            low: low,
+            color: color,
+            thickWidth: thickWidth,
+            thinWidth: thinWidth,
+            borderRadius: borderRadius,
+          );
+          break;
+        case ChartType.bar:
+          _drawOhlcBar(
+            canvas,
+            params,
+            x: x,
+            open: open,
+            close: close,
+            high: high,
+            low: low,
+            color: color,
+          );
+          break;
+        case ChartType.line:
+          // Drawn as a single path by [_drawPriceLine].
+          break;
       }
     }
     // Draw volume bar
@@ -1195,6 +1189,132 @@ class ChartPainter extends CustomPainter {
         }
       }
     }
+  }
+
+  /// Paints a single candlestick: a thick open-close body plus a thin
+  /// high-low wick. Also used for Heikin Ashi, whose values are already
+  /// smoothed by the time they reach the painter.
+  void _drawCandleBody(
+    Canvas canvas,
+    PainterParams params, {
+    required double x,
+    required double open,
+    required double close,
+    required double? high,
+    required double? low,
+    required Color color,
+    required double thickWidth,
+    required double thinWidth,
+    required double borderRadius,
+  }) {
+    final openY = params.fitPrice(open);
+    final closeY = params.fitPrice(close);
+
+    // Draw candle body (open-close) with optional rounded corners
+    if (borderRadius > 0 && thickWidth > 2) {
+      // Use rounded rectangle for thicker candles
+      final rect = Rect.fromLTRB(
+        x - thickWidth / 2,
+        min(openY, closeY),
+        x + thickWidth / 2,
+        max(openY, closeY),
+      );
+      final rrect = RRect.fromRectAndRadius(
+        rect,
+        Radius.circular(min(borderRadius, thickWidth / 2)),
+      );
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
+      );
+    } else {
+      // Use line for thin candles or when borderRadius is 0
+      canvas.drawLine(
+        Offset(x, openY),
+        Offset(x, closeY),
+        Paint()
+          ..strokeWidth = thickWidth
+          ..color = color,
+      );
+    }
+
+    // Draw wicks (high-low) - always as thin lines
+    if (high != null && low != null) {
+      canvas.drawLine(
+        Offset(x, params.fitPrice(high)),
+        Offset(x, params.fitPrice(low)),
+        Paint()
+          ..strokeWidth = thinWidth
+          ..color = color,
+      );
+    }
+  }
+
+  /// Paints a single OHLC bar: a vertical high-low line with a tick pointing
+  /// left at the open and a tick pointing right at the close.
+  void _drawOhlcBar(
+    Canvas canvas,
+    PainterParams params, {
+    required double x,
+    required double open,
+    required double close,
+    required double? high,
+    required double? low,
+    required Color color,
+  }) {
+    final strokeWidth = max(params.candleWidth * 0.18, 0.8);
+    final tickLength = max(params.candleWidth * 0.35, 1.5);
+    final paint = Paint()
+      ..strokeWidth = strokeWidth
+      ..color = color;
+
+    // Vertical range. Falls back to the open-close range when the candle
+    // carries no wick data.
+    canvas.drawLine(
+      Offset(x, params.fitPrice(high ?? max(open, close))),
+      Offset(x, params.fitPrice(low ?? min(open, close))),
+      paint,
+    );
+
+    final openY = params.fitPrice(open);
+    canvas.drawLine(Offset(x - tickLength, openY), Offset(x, openY), paint);
+
+    final closeY = params.fitPrice(close);
+    canvas.drawLine(Offset(x, closeY), Offset(x + tickLength, closeY), paint);
+  }
+
+  /// Paints the close-price line for [ChartType.line] as a single path, so
+  /// the segments join cleanly instead of being stitched candle by candle.
+  void _drawPriceLine(Canvas canvas, PainterParams params) {
+    final paint = Paint()
+      ..color = params.style.effectiveLineColor
+      ..strokeWidth = params.style.lineWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    var started = false;
+
+    for (int i = 0; i < params.candles.length; i++) {
+      final close = params.candles[i].close;
+      if (close == null) {
+        started = false;
+        continue;
+      }
+      final dx = i * params.candleWidth;
+      final dy = params.fitPrice(close);
+      if (started) {
+        path.lineTo(dx, dy);
+      } else {
+        path.moveTo(dx, dy);
+        started = true;
+      }
+    }
+
+    canvas.drawPath(path, paint);
   }
 
   void _drawTapHighlightAndOverlay(canvas, PainterParams params) {

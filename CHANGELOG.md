@@ -1,3 +1,24 @@
+## 1.7.0
+
+**Chart Types: Bars, Line & Heikin Ashi**
+
+### Chart types
+* **`ChartType`** (`candlestick`, `bar`, `line`, `heikinAshi`) — new enum selecting how the main price series is rendered.
+* **`ChartStyle.chartType`** — defaults to `ChartType.candlestick`, so existing charts are unchanged.
+* **`ChartType.bar`** — OHLC bars: a vertical high/low line with a left tick at the open and a right tick at the close.
+* **`ChartType.line`** — a single close-price path. While active, the price axis is bounded by the closes instead of the highs/lows, so the line fills the panel instead of sitting squashed in the middle.
+* **`ChartStyle.lineColor` / `ChartStyle.lineWidth`** — styling for the line series. `lineColor` falls back to `priceGainColor`.
+
+### Heikin Ashi
+* **`CandleData.toHeikinAshi(List<CandleData>)`** — converts a full series to Heikin Ashi. The HA open is recursive, so it must always run over the whole series; candles missing `open`/`close` pass through untouched and reset the recursion.
+* **`ChartType.heikinAshi`** — `InteractiveChart` derives the smoothed series internally (cached, recomputed only when the source list changes). Because the transform happens before measuring and painting, indicators, the price axis and the crosshair OHLC panel all report Heikin Ashi values, matching TradingView's behaviour.
+* Overlays (trading lines, zones, Fibonacci, …) keep their real prices, so they sit on the Heikin Ashi axis rather than on the original candles — the same trade-off every platform makes.
+
+### Backwards Compatibility
+* All changes are additive. `ChartStyle.chartType` defaults to `candlestick`, so charts written for 1.6.0 render identically.
+
+---
+
 ## 1.6.0
 
 **Tap-to-Select Drawings, Crosshair Beyond the Data & Fractals Indicator**
