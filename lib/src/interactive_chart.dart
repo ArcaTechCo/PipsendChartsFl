@@ -10,6 +10,7 @@ import 'candle_data.dart';
 import 'chart_type.dart';
 import 'chart_painter.dart';
 import 'chart_style.dart';
+import 'common/text_layout_cache.dart';
 import 'painter_params.dart';
 import 'x_axis_offset_details.dart';
 import 'tap_details.dart';
@@ -317,6 +318,11 @@ class _InteractiveChartState extends State<InteractiveChart> {
   Offset? _initialFocalPoint;
   PainterParams? _prevParams; // used in onTapUp event
 
+  final TextLayoutCache _textLayoutCache = TextLayoutCache();
+
+  intl.DateFormat? _crosshairTimeFormat;
+  String? _crosshairTimeFormatLocale;
+
   // Last selection rect reported to the host via
   // [onSelectedOverlayRectChanged], used to avoid redundant callbacks.
   Rect? _lastReportedSelectionRect;
@@ -482,6 +488,7 @@ class _InteractiveChartState extends State<InteractiveChart> {
     _longPressTimer?.cancel();
     // Detach controller
     widget.controller?.detach();
+    _textLayoutCache.dispose();
     super.dispose();
   }
 
@@ -858,19 +865,21 @@ class _InteractiveChartState extends State<InteractiveChart> {
           playheadIndex: phRelInVisible,
           playheadTickProgress: widget.playheadTickProgress,
           playheadStyle: widget.playheadStyle,
+          textLayoutCache: _textLayoutCache,
         );
 
         // Report the selected overlay's screen rect so the host can keep a
         // floating toolbar glued to it as the chart pans/zooms.
         _reportSelectionRect(endParams);
 
-        final child = TweenAnimationBuilder(
-          tween: PainterParamsTween(
-            end: endParams,
+        final child = TweenAnimationBuilder<AnimatedPainterValues>(
+          tween: AnimatedPainterValuesTween(
+            end: endParams.animatedValues,
           ),
           duration: Duration(milliseconds: 300),
           curve: Curves.easeOut,
-          builder: (_, PainterParams params, __) {
+          builder: (_, AnimatedPainterValues values, __) {
+            final params = endParams.withAnimatedValues(values);
             _prevParams = params;
             return RepaintBoundary(
               child: CustomPaint(
@@ -2249,8 +2258,16 @@ class _InteractiveChartState extends State<InteractiveChart> {
 
   String defaultPriceLabel(double price) => price.toStringAsFixed(2);
 
-  String defaultCrosshairTimeLabel(int timestamp) => intl.DateFormat("EEE d MMM yy · HH:mm")
-      .format(DateTime.fromMillisecondsSinceEpoch(timestamp));
+  String defaultCrosshairTimeLabel(int timestamp) {
+    final locale = intl.Intl.getCurrentLocale();
+    var format = _crosshairTimeFormat;
+    if (format == null || _crosshairTimeFormatLocale != locale) {
+      format = intl.DateFormat("EEE d MMM yy · HH:mm");
+      _crosshairTimeFormat = format;
+      _crosshairTimeFormatLocale = locale;
+    }
+    return format.format(DateTime.fromMillisecondsSinceEpoch(timestamp));
+  }
 
   void _confirmPlacementPoint() {
     if (_placementConfirmedThisGesture) return;

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'candle_data.dart';
@@ -127,6 +128,7 @@ class ChartPainter extends CustomPainter {
     
     // Draw overlays (not clipped, so labels can extend outside)
     _drawOverlays(canvas, params);
+    params.textLayoutCache?.endFrame();
     
     canvas.restore();
 
@@ -1559,9 +1561,9 @@ class ChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(ChartPainter oldDelegate) {
-    // Check if overlays or indicators changed by comparing the list reference
-    if (overlays != oldDelegate.overlays) return true;
-    if (indicators != oldDelegate.indicators) return true;
+    // Check if overlays or indicators changed by comparing their instances
+    if (!identicalElements(overlays, oldDelegate.overlays)) return true;
+    if (!identicalElements(indicators, oldDelegate.indicators)) return true;
     
     return params.shouldRepaint(oldDelegate.params) ||
         draggedOverlay != oldDelegate.draggedOverlay ||
@@ -1573,7 +1575,48 @@ class ChartPainter extends CustomPainter {
         isResizingFibonacci != oldDelegate.isResizingFibonacci ||
         isResizingTrendLine != oldDelegate.isResizingTrendLine ||
         isResizingTrendStart != oldDelegate.isResizingTrendStart ||
-        isResizingTrendEnd != oldDelegate.isResizingTrendEnd;
+        isResizingTrendEnd != oldDelegate.isResizingTrendEnd ||
+        isResizingPositionEntry != oldDelegate.isResizingPositionEntry ||
+        isResizingPositionSL != oldDelegate.isResizingPositionSL ||
+        isResizingPositionTP != oldDelegate.isResizingPositionTP ||
+        isDraggingVerticalLine != oldDelegate.isDraggingVerticalLine ||
+        isResizingFibExtPointA != oldDelegate.isResizingFibExtPointA ||
+        isResizingFibExtPointB != oldDelegate.isResizingFibExtPointB ||
+        isResizingFibExtPointC != oldDelegate.isResizingFibExtPointC ||
+        isResizingFibFanStart != oldDelegate.isResizingFibFanStart ||
+        isResizingFibFanEnd != oldDelegate.isResizingFibFanEnd ||
+        isResizingArrowStart != oldDelegate.isResizingArrowStart ||
+        isResizingArrowEnd != oldDelegate.isResizingArrowEnd ||
+        isResizingCircleCenter != oldDelegate.isResizingCircleCenter ||
+        isResizingCircleRadius != oldDelegate.isResizingCircleRadius ||
+        isDraggingTextTool != oldDelegate.isDraggingTextTool ||
+        isResizingGanttStart != oldDelegate.isResizingGanttStart ||
+        isResizingGanttEnd != oldDelegate.isResizingGanttEnd ||
+        _labelGettersChanged(oldDelegate);
+  }
+
+  bool _labelGettersChanged(ChartPainter oldDelegate) {
+    if (getPriceLabel != oldDelegate.getPriceLabel &&
+        getPriceLabel(params.maxPrice) !=
+            oldDelegate.getPriceLabel(params.maxPrice)) {
+      return true;
+    }
+    final candles = params.candles;
+    if (candles.isEmpty) return false;
+    final candle = candles.first;
+    if (getTimeLabel != oldDelegate.getTimeLabel &&
+        getTimeLabel(candle.timestamp, candles.length) !=
+            oldDelegate.getTimeLabel(candle.timestamp, candles.length)) {
+      return true;
+    }
+    if (params.tapPosition == null) return false;
+    if (getCrosshairTimeLabel != oldDelegate.getCrosshairTimeLabel &&
+        getCrosshairTimeLabel(candle.timestamp) !=
+            oldDelegate.getCrosshairTimeLabel(candle.timestamp)) {
+      return true;
+    }
+    return getOverlayInfo != oldDelegate.getOverlayInfo &&
+        !mapEquals(getOverlayInfo(candle), oldDelegate.getOverlayInfo(candle));
   }
 }
 

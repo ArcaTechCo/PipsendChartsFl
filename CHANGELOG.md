@@ -1,3 +1,24 @@
+## 1.7.1
+
+**Rendering Performance With Many Trading Lines**
+
+### Performance
+* **Text layout cache** — trading line titles and price labels are laid out once per text and style and reused across frames instead of being laid out on every paint. Entries not used during a frame are disposed when the frame ends. Hit testing reuses the same layouts.
+* **Off-screen culling** — trading lines priced far outside the visible range skip their line and labels. Labels with `LabelPosition.custom` still paint.
+* **Hit testing** — lines far from the pointer are rejected before any text is laid out.
+* **Fewer repaints** — `shouldRepaint` compares overlays and indicators item by item by identity instead of by list reference, and candles item by item, so rebuilding the chart with the same overlay instances no longer repaints it.
+* **Range animation** — the 300 ms range tween only restarts when the price/volume range or the playhead actually changes, not on every rebuild.
+* `defaultCrosshairTimeLabel` reuses its `DateFormat`.
+
+### Behavior
+* **`ChartStyle` and `PlayheadStyle`** now compare by value (`==`/`hashCode`).
+* **Overlay contract** — an overlay that did not change should keep its instance; a changed overlay must be a new instance. `TradingLine` is immutable, so this matches building a new line whenever its text or price changes.
+
+### Backwards Compatibility
+* No public API was removed or made required. Charts written for 1.7.0 render identically.
+
+---
+
 ## 1.7.0
 
 **Chart Types: Bars, Line & Heikin Ashi**

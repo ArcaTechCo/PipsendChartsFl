@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import 'chart_style.dart';
 import 'candle_data.dart';
+import 'common/text_layout_cache.dart';
 import 'overlays/playhead_style.dart';
 import 'overlays/drawing_placement.dart';
 
@@ -60,6 +61,8 @@ class PainterParams {
   /// via overlays).
   final PlayheadStyle? playheadStyle;
 
+  final TextLayoutCache? textLayoutCache;
+
   /// The price level at the tap position (null if not tapping).
   double? get tapPrice => tapPosition != null
       ? getPriceFromY(tapPosition!.dy)
@@ -88,6 +91,7 @@ class PainterParams {
     this.playheadIndex,
     this.playheadTickProgress,
     this.playheadStyle,
+    this.textLayoutCache,
   });
 
   double get chartWidth => // width without price labels
@@ -222,53 +226,59 @@ class PainterParams {
     return volumeHeight - vol + priceHeight - baseAmount;
   }
 
-  static PainterParams lerp(PainterParams a, PainterParams b, double t) {
-    double lerpField(double getField(PainterParams p)) =>
-        lerpDouble(getField(a), getField(b), t)!;
-    // Tick progress lerps as a float when both sides have it. Index
-    // does NOT lerp — it would create fractional indices that the
-    // painter cannot use. When the index changes mid-animation we
-    // simply snap to the new value.
-    final double? tickProgress;
-    if (a.playheadTickProgress != null &&
-        b.playheadTickProgress != null &&
-        a.playheadIndex == b.playheadIndex) {
-      tickProgress = lerpDouble(
-        a.playheadTickProgress!,
-        b.playheadTickProgress!,
-        t,
+  AnimatedPainterValues get animatedValues => AnimatedPainterValues(
+        maxPrice: maxPrice,
+        minPrice: minPrice,
+        maxVol: maxVol,
+        minVol: minVol,
+        playheadIndex: playheadIndex,
+        playheadTickProgress: playheadTickProgress,
       );
-    } else {
-      tickProgress = b.playheadTickProgress;
+
+  PainterParams withAnimatedValues(AnimatedPainterValues values) {
+    final double? tickProgress = values.playheadIndex == playheadIndex &&
+            values.playheadTickProgress != null &&
+            playheadTickProgress != null
+        ? values.playheadTickProgress
+        : playheadTickProgress;
+    if (values.maxPrice == maxPrice &&
+        values.minPrice == minPrice &&
+        values.maxVol == maxVol &&
+        values.minVol == minVol &&
+        tickProgress == playheadTickProgress) {
+      return this;
     }
     return PainterParams(
-      candles: b.candles,
-      fullCandles: b.fullCandles,
-      style: b.style,
-      size: b.size,
-      candleWidth: b.candleWidth,
-      startOffset: b.startOffset,
-      maxPrice: lerpField((p) => p.maxPrice),
-      minPrice: lerpField((p) => p.minPrice),
-      maxVol: lerpField((p) => p.maxVol),
-      minVol: lerpField((p) => p.minVol),
-      xShift: b.xShift,
-      tapPosition: b.tapPosition,
-      selectedOverlayId: b.selectedOverlayId,
-      showCrosshairInfoPanel: b.showCrosshairInfoPanel,
-      placement: b.placement,
-      placementCursor: b.placementCursor,
-      placementPoints: b.placementPoints,
-      leadingTrends: b.leadingTrends,
-      trailingTrends: b.trailingTrends,
-      playheadIndex: b.playheadIndex,
+      candles: candles,
+      fullCandles: fullCandles,
+      style: style,
+      size: size,
+      candleWidth: candleWidth,
+      startOffset: startOffset,
+      maxPrice: values.maxPrice,
+      minPrice: values.minPrice,
+      maxVol: values.maxVol,
+      minVol: values.minVol,
+      xShift: xShift,
+      tapPosition: tapPosition,
+      selectedOverlayId: selectedOverlayId,
+      showCrosshairInfoPanel: showCrosshairInfoPanel,
+      placement: placement,
+      placementCursor: placementCursor,
+      placementPoints: placementPoints,
+      leadingTrends: leadingTrends,
+      trailingTrends: trailingTrends,
+      playheadIndex: playheadIndex,
       playheadTickProgress: tickProgress,
-      playheadStyle: b.playheadStyle,
+      playheadStyle: playheadStyle,
+      textLayoutCache: textLayoutCache,
     );
   }
 
   bool shouldRepaint(PainterParams other) {
-    if (candles.length != other.candles.length) return true;
+    if (!identicalElements(candles, other.candles)) return true;
+
+    if (!identical(fullCandles, other.fullCandles)) return true;
 
     if (size != other.size ||
         candleWidth != other.candleWidth ||
@@ -303,12 +313,92 @@ class PainterParams {
   }
 }
 
-class PainterParamsTween extends Tween<PainterParams> {
-  PainterParamsTween({
-    PainterParams? begin,
-    required PainterParams end,
+class AnimatedPainterValues {
+  final double maxPrice;
+  final double minPrice;
+  final double maxVol;
+  final double minVol;
+  final int? playheadIndex;
+  final double? playheadTickProgress;
+
+  const AnimatedPainterValues({
+    required this.maxPrice,
+    required this.minPrice,
+    required this.maxVol,
+    required this.minVol,
+    this.playheadIndex,
+    this.playheadTickProgress,
+  });
+
+  static AnimatedPainterValues lerp(
+    AnimatedPainterValues a,
+    AnimatedPainterValues b,
+    double t,
+  ) {
+    // Tick progress lerps as a float when both sides have it. Index
+    // does NOT lerp — it would create fractional indices that the
+    // painter cannot use. When the index changes mid-animation we
+    // simply snap to the new value.
+    final double? tickProgress;
+    if (a.playheadTickProgress != null &&
+        b.playheadTickProgress != null &&
+        a.playheadIndex == b.playheadIndex) {
+      tickProgress = lerpDouble(
+        a.playheadTickProgress!,
+        b.playheadTickProgress!,
+        t,
+      );
+    } else {
+      tickProgress = b.playheadTickProgress;
+    }
+    return AnimatedPainterValues(
+      maxPrice: lerpDouble(a.maxPrice, b.maxPrice, t)!,
+      minPrice: lerpDouble(a.minPrice, b.minPrice, t)!,
+      maxVol: lerpDouble(a.maxVol, b.maxVol, t)!,
+      minVol: lerpDouble(a.minVol, b.minVol, t)!,
+      playheadIndex: b.playheadIndex,
+      playheadTickProgress: tickProgress,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AnimatedPainterValues &&
+          maxPrice == other.maxPrice &&
+          minPrice == other.minPrice &&
+          maxVol == other.maxVol &&
+          minVol == other.minVol &&
+          playheadIndex == other.playheadIndex &&
+          playheadTickProgress == other.playheadTickProgress;
+
+  @override
+  int get hashCode => Object.hash(
+        maxPrice,
+        minPrice,
+        maxVol,
+        minVol,
+        playheadIndex,
+        playheadTickProgress,
+      );
+}
+
+class AnimatedPainterValuesTween extends Tween<AnimatedPainterValues> {
+  AnimatedPainterValuesTween({
+    AnimatedPainterValues? begin,
+    required AnimatedPainterValues end,
   }) : super(begin: begin, end: end);
 
   @override
-  PainterParams lerp(double t) => PainterParams.lerp(begin ?? end!, end!, t);
+  AnimatedPainterValues lerp(double t) =>
+      AnimatedPainterValues.lerp(begin ?? end!, end!, t);
+}
+
+bool identicalElements(List<Object?> a, List<Object?> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (!identical(a[i], b[i])) return false;
+  }
+  return true;
 }

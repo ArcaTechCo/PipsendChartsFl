@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'chart_type.dart';
 import 'grid_style.dart';
@@ -184,4 +185,62 @@ class ChartStyle {
 
   Color get effectiveCrosshairLabelColor =>
       crosshairLabelColor ?? selectionHighlightColor.withValues(alpha: 1.0);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChartStyle &&
+          runtimeType == other.runtimeType &&
+          volumeHeightFactor == other.volumeHeightFactor &&
+          priceLabelWidth == other.priceLabelWidth &&
+          timeLabelHeight == other.timeLabelHeight &&
+          timeLabelStyle == other.timeLabelStyle &&
+          priceLabelStyle == other.priceLabelStyle &&
+          overlayTextStyle == other.overlayTextStyle &&
+          chartType == other.chartType &&
+          lineWidth == other.lineWidth &&
+          lineColor == other.lineColor &&
+          priceGainColor == other.priceGainColor &&
+          priceLossColor == other.priceLossColor &&
+          showVolume == other.showVolume &&
+          volumeColor == other.volumeColor &&
+          listEquals(trendLineStyles, other.trendLineStyles) &&
+          gridStyle == other.gridStyle &&
+          priceGridLineColor == other.priceGridLineColor &&
+          selectionHighlightColor == other.selectionHighlightColor &&
+          crosshairLabelColor == other.crosshairLabelColor &&
+          crosshairDashed == other.crosshairDashed &&
+          overlayBackgroundColor == other.overlayBackgroundColor &&
+          candleBorderRadius == other.candleBorderRadius &&
+          adaptiveLabels == other.adaptiveLabels &&
+          priceLabelCount == other.priceLabelCount &&
+          timeLabelDensity == other.timeLabelDensity;
+
+  @override
+  int get hashCode => Object.hashAll([
+        volumeHeightFactor,
+        priceLabelWidth,
+        timeLabelHeight,
+        timeLabelStyle,
+        priceLabelStyle,
+        overlayTextStyle,
+        chartType,
+        lineWidth,
+        lineColor,
+        priceGainColor,
+        priceLossColor,
+        showVolume,
+        volumeColor,
+        Object.hashAll(trendLineStyles),
+        gridStyle,
+        priceGridLineColor,
+        selectionHighlightColor,
+        crosshairLabelColor,
+        crosshairDashed,
+        overlayBackgroundColor,
+        candleBorderRadius,
+        adaptiveLabels,
+        priceLabelCount,
+        timeLabelDensity,
+      ]);
 }

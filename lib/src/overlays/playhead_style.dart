@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
 /// Visual configuration for the built-in replay playhead.
@@ -123,4 +124,44 @@ class PlayheadStyle {
       handleSize: handleSize ?? this.handleSize,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlayheadStyle &&
+          runtimeType == other.runtimeType &&
+          lineColor == other.lineColor &&
+          lineWidth == other.lineWidth &&
+          listEquals(dashPattern, other.dashPattern) &&
+          showLabel == other.showLabel &&
+          labelStyle == other.labelStyle &&
+          labelBackground == other.labelBackground &&
+          labelHorizontalPadding == other.labelHorizontalPadding &&
+          labelVerticalPadding == other.labelVerticalPadding &&
+          draggable == other.draggable &&
+          hitRadius == other.hitRadius &&
+          dimRightSide == other.dimRightSide &&
+          dimColor == other.dimColor &&
+          dimOpacity == other.dimOpacity &&
+          showDragHandles == other.showDragHandles &&
+          handleSize == other.handleSize;
+
+  @override
+  int get hashCode => Object.hash(
+        lineColor,
+        lineWidth,
+        dashPattern == null ? null : Object.hashAll(dashPattern!),
+        showLabel,
+        labelStyle,
+        labelBackground,
+        labelHorizontalPadding,
+        labelVerticalPadding,
+        draggable,
+        hitRadius,
+        dimRightSide,
+        dimColor,
+        dimOpacity,
+        showDragHandles,
+        handleSize,
+      );
 }

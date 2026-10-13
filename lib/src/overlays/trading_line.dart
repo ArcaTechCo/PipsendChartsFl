@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 import '../painter_params.dart';
 import 'overlay.dart' as chart_overlay;
@@ -49,6 +51,10 @@ class TradingLine extends chart_overlay.ChartOverlay {
   /// If null, line extends to the right edge of the chart.
   final int? endTime;
 
+  static const double _maxTextHeightFactor = 3;
+
+  static final Paint _strokePaint = Paint()..style = PaintingStyle.stroke;
+
   TradingLine({
     String? id,
     required this.price,
@@ -76,6 +82,13 @@ class TradingLine extends chart_overlay.ChartOverlay {
 
     final y = params.fitPrice(price);
 
+    if (!_isNearPaintArea(y, params)) {
+      if (options.showLabel && _hasFixedLabelOffset) {
+        _drawLabelWithCustomText(canvas, y, params, isBeingDragged: isBeingDragged);
+      }
+      return;
+    }
+
     // Draw drag indicator if being dragged
     if (isBeingDragged) {
       _drawDragIndicator(canvas, y, params);
@@ -93,6 +106,39 @@ class TradingLine extends chart_overlay.ChartOverlay {
     if (options.showPrice) {
       _drawPrice(canvas, y, params, isBeingDragged: isBeingDragged);
     }
+  }
+
+  bool get _hasFixedLabelOffset =>
+      options.labelPosition == LabelPosition.custom &&
+      options.customLabelOffset != null;
+
+  bool _isNearPaintArea(double y, PainterParams params) {
+    final margin =
+        math.max(style.labelFontSize, style.priceFontSize) * _maxTextHeightFactor +
+            style.labelVerticalPadding.abs() +
+            8;
+    return y >= -margin && y <= params.size.height + margin;
+  }
+
+  String? get _labelText {
+    final label = options.title ?? type.defaultTitle;
+    if (label.isEmpty && options.customText == null) return null;
+    return options.customText != null ? '$label ${options.customText}' : label;
+  }
+
+  TextStyle _labelTextStyle({bool isBeingDragged = false}) => TextStyle(
+        color: style.labelColor ?? style.color,
+        fontSize: isBeingDragged ? style.labelFontSize + 1 : style.labelFontSize,
+        fontWeight: FontWeight.bold,
+      );
+
+  TextPainter _layoutText(PainterParams params, String text, TextStyle textStyle) {
+    final cache = params.textLayoutCache;
+    if (cache != null) return cache.layout(text, textStyle);
+    return TextPainter(
+      text: TextSpan(text: text, style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
   }
 
   void _drawDragIndicator(Canvas canvas, double y, PainterParams params) {
@@ -139,15 +185,21 @@ class TradingLine extends chart_overlay.ChartOverlay {
     // Clip to visible range
     startX = startX.clamp(0, params.chartWidth);
     endX = endX.clamp(0, params.chartWidth);
+
+    final strokeWidth = isBeingDragged ? style.lineWidth + 1 : style.lineWidth;
+    final reach = strokeWidth / 2 + 1;
+    if (y + reach < 0 || y - reach > params.chartHeight) return;
+    final needsClip = y - reach < 0 || y + reach > params.chartHeight;
     
     // Clip only the line to the chart area
-    canvas.save();
-    canvas.clipRect(Offset.zero & Size(params.chartWidth, params.chartHeight));
+    if (needsClip) {
+      canvas.save();
+      canvas.clipRect(Offset.zero & Size(params.chartWidth, params.chartHeight));
+    }
     
-    final paint = Paint()
+    final paint = _strokePaint
       ..color = style.color
-      ..strokeWidth = isBeingDragged ? style.lineWidth + 1 : style.lineWidth
-      ..style = PaintingStyle.stroke;
+      ..strokeWidth = strokeWidth;
 
     if (style.dashPattern != null) {
       _drawDashedLine(canvas, y, params, paint, startX: startX, endX: endX);
@@ -159,7 +211,7 @@ class TradingLine extends chart_overlay.ChartOverlay {
       );
     }
     
-    canvas.restore();
+    if (needsClip) canvas.restore();
   }
 
   void _drawDashedLine(Canvas canvas, double y, PainterParams params, Paint paint, {double startX = 0, double? endX}) {
@@ -183,24 +235,15 @@ class TradingLine extends chart_overlay.ChartOverlay {
   }
 
   void _drawLabelWithCustomText(Canvas canvas, double y, PainterParams params, {bool isBeingDragged = false}) {
-    final label = options.title ?? type.defaultTitle;
-    if (label.isEmpty && options.customText == null) return;
-
     // Build the combined text: "SL -3.0%"
-    final combinedText = options.customText != null 
-        ? '$label ${options.customText}'
-        : label;
+    final combinedText = _labelText;
+    if (combinedText == null) return;
 
-    final textStyle = TextStyle(
-      color: style.labelColor ?? style.color,
-      fontSize: isBeingDragged ? style.labelFontSize + 1 : style.labelFontSize,
-      fontWeight: FontWeight.bold,
+    final textPainter = _layoutText(
+      params,
+      combinedText,
+      _labelTextStyle(isBeingDragged: isBeingDragged),
     );
-
-    final textPainter = TextPainter(
-      text: TextSpan(text: combinedText, style: textStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
 
     // Position above the line
     final offset = _getLabelOffset(textPainter, y, params);
@@ -233,10 +276,7 @@ class TradingLine extends chart_overlay.ChartOverlay {
       fontWeight: FontWeight.w600,
     );
 
-    final textPainter = TextPainter(
-      text: TextSpan(text: priceText, style: textStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
+    final textPainter = _layoutText(params, priceText, textStyle);
 
     // Draw on the right side
     final offset = Offset(
@@ -265,34 +305,6 @@ class TradingLine extends chart_overlay.ChartOverlay {
     //   3. A thin ±5 px strip along the line itself across the chart,
     //      to support drag handles without bleeding into pan gestures.
 
-    // Zone 1 — title text.
-    final titleText = options.title ?? type.defaultTitle;
-    if (titleText.isNotEmpty || options.customText != null) {
-      final combinedText = options.customText != null
-          ? '$titleText ${options.customText}'
-          : titleText;
-      final tp = TextPainter(
-        text: TextSpan(
-          text: combinedText,
-          style: TextStyle(
-            fontSize: style.labelFontSize,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final labelOffset = _getLabelOffset(tp, y, params);
-      // 8 px padding around the text gives a comfortable touch target
-      // without being so big it covers a chunk of the chart.
-      final titleRect = Rect.fromLTWH(
-        labelOffset.dx - 8,
-        labelOffset.dy - 4,
-        tp.width + 16,
-        tp.height + 8,
-      );
-      if (titleRect.contains(position)) return true;
-    }
-
     // Zone 2 — price gutter on the right.
     if (position.dx >= params.chartWidth - 4 &&
         position.dx <= params.chartWidth + 80 &&
@@ -303,10 +315,35 @@ class TradingLine extends chart_overlay.ChartOverlay {
 
     // Zone 3 — thin line strip across the drawable chart area.
     const lineHitHalfHeight = 5.0;
-    return position.dy >= y - lineHitHalfHeight &&
+    if (position.dy >= y - lineHitHalfHeight &&
         position.dy <= y + lineHitHalfHeight &&
         position.dx >= 0 &&
-        position.dx <= params.chartWidth;
+        position.dx <= params.chartWidth) {
+      return true;
+    }
+
+    // Zone 1 — title text.
+    final combinedText = _labelText;
+    if (combinedText == null) return false;
+    if (!_hasFixedLabelOffset) {
+      final dy = position.dy - y;
+      final bottomReach = 5 - style.labelVerticalPadding;
+      final topReach = style.labelFontSize * _maxTextHeightFactor +
+          style.labelVerticalPadding +
+          5;
+      if (dy > bottomReach || dy < -topReach) return false;
+    }
+    final tp = _layoutText(params, combinedText, _labelTextStyle());
+    final labelOffset = _getLabelOffset(tp, y, params);
+    // 8 px padding around the text gives a comfortable touch target
+    // without being so big it covers a chunk of the chart.
+    final titleRect = Rect.fromLTWH(
+      labelOffset.dx - 8,
+      labelOffset.dy - 4,
+      tp.width + 16,
+      tp.height + 8,
+    );
+    return titleRect.contains(position);
   }
 
   /// Creates a copy of this trading line with a new price.
